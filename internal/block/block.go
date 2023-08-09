@@ -2,6 +2,8 @@ package block
 
 import (
 	"encoding/json"
+	"fmt"
+	"log"
 	"time"
 
 	bolt "go.etcd.io/bbolt"
@@ -52,12 +54,41 @@ func (bc *Blockchain) AddBlock(data string) {
 			panic(err)
 		}
 
-		err = b.Put([]byte("l"), newBlock.Hash)
+		err = b.Put([]byte(lastBlock), newBlock.Hash)
 		if err != nil {
 			panic(err)
 		}
 
 		bc.TipHash = newBlock.Hash
+
+		return nil
+	})
+
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (bc *Blockchain) PrintChain() {
+	fmt.Println("Printing chain...")
+	err := bc.DB.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(blockBucket))
+
+		var block Block
+		// form a fake block
+		block.PrevBlockHash = bc.TipHash
+		// TODO: why block.PrevBlockHash != nil doesn't work?
+		for len(block.PrevBlockHash) != 0 {
+			data := b.Get(block.PrevBlockHash)
+			err := json.Unmarshal(data, &block)
+			if err != nil {
+				panic(err)
+			}
+			fmt.Printf("Prev. hash: %x\n", block.PrevBlockHash)
+			fmt.Printf("Data: %s\n", block.Data)
+			fmt.Printf("Hash: %x\n", block.Hash)
+			fmt.Println()
+		}
 
 		return nil
 	})
@@ -74,13 +105,13 @@ func NewGenesisBlock() *Block {
 func NewBlockchain(conf *utils.Config) *Blockchain {
 	bolt_db := db.GetDB(conf)
 	var tip []byte
-	var blocks []*Block
 
 	err := bolt_db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(blockBucket))
 
 		if b == nil {
 			genesis := NewGenesisBlock()
+			log.Printf("Created genesis block with hash %x\n", genesis.Hash)
 			b, err := tx.CreateBucket([]byte(blockBucket))
 			if err != nil {
 				panic(err)
@@ -101,22 +132,8 @@ func NewBlockchain(conf *utils.Config) *Blockchain {
 				panic(err)
 			}
 			tip = genesis.Hash
-			blocks = append(blocks, genesis)
 		} else {
 			tip = b.Get([]byte(lastBlock))
-
-			var block Block
-			// form a fake block
-			block.PrevBlockHash = tip
-			// TODO: why block.PrevBlockHash != nil doesn't work?
-			for len(block.PrevBlockHash) != 0 {
-				data := b.Get(block.PrevBlockHash)
-				err := json.Unmarshal(data, &block)
-				if err != nil {
-					panic(err)
-				}
-				blocks = append(blocks, &block)
-			}
 		}
 
 		return nil

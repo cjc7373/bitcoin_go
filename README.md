@@ -11,7 +11,7 @@ This project is not intended to be compatible with current bitcoin protocols.
 - Serialization: protobuf, this is used both for network traffic and data persistence
 - Network communication: grpc
 - Key-Value Database: bbolt
-- Cli framework: Cobra
+- Cli framework: cobra
 
 ### Implemetation details
 - node discovery: one node must manually specify a node to connect, then it can use RPC to get other nodes' info
