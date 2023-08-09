@@ -9,7 +9,7 @@ import (
 	"encoding/pem"
 
 	"github.com/btcsuite/btcutil/base58"
-	"golang.org/x/crypto/ripemd160"
+	"github.com/cjc7373/bitcoin_go/internal/utils"
 )
 
 type Wallet struct {
@@ -36,12 +36,8 @@ func NewWalletFromPEM(pemEncoded []byte) *Wallet {
 	if err != nil {
 		panic(err)
 	}
-	wallet := Wallet{*privateKey, getPubKey(privateKey)}
+	wallet := Wallet{*privateKey, utils.EncodePubKey(privateKey)}
 	return &wallet
-}
-
-func getPubKey(private *ecdsa.PrivateKey) []byte {
-	return append(private.PublicKey.X.Bytes(), private.PublicKey.Y.Bytes()...)
 }
 
 func newKeyPair() (ecdsa.PrivateKey, []byte) {
@@ -50,7 +46,7 @@ func newKeyPair() (ecdsa.PrivateKey, []byte) {
 	if err != nil {
 		panic(err)
 	}
-	pubKey := getPubKey(private)
+	pubKey := utils.EncodePubKey(private)
 
 	return *private, pubKey
 }
@@ -68,9 +64,9 @@ func (w *Wallet) EncodeToPEM() []byte {
 func (w *Wallet) GetAddress() string {
 	// we try to generate a legal bitcoin address here, so we follow the protocol
 	// https://en.bitcoin.it/wiki/Protocol_documentation#Addresses
-	pubKeyHash := HashPubKey(w.PublicKey)
+	pubKeyHash := utils.HashPubKey(w.PublicKey)
 
-	version := []byte{0}
+	version := []byte{0} // P2PKH address
 	versionedPayload := append(version, pubKeyHash...)
 
 	firstSHA := sha256.Sum256(versionedPayload)
@@ -81,18 +77,4 @@ func (w *Wallet) GetAddress() string {
 	address := base58.Encode(fullPayload)
 
 	return address
-}
-
-func HashPubKey(pubKey []byte) []byte {
-	publicSHA256 := sha256.Sum256(pubKey)
-
-	RIPEMD160Hasher := ripemd160.New()
-	_, err := RIPEMD160Hasher.Write(publicSHA256[:])
-	if err != nil {
-		panic(err)
-	}
-
-	publicRIPEMD160 := RIPEMD160Hasher.Sum(nil)
-
-	return publicRIPEMD160
 }

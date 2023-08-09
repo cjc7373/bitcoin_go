@@ -1,6 +1,6 @@
 This project is based on [Jeiwan/blockchain_go](https://github.com/Jeiwan/blockchain_go) and his related blog post.
 
-This project is not intended to be compatible with current bitcoin protocols.
+This project is only a simplified bitcoin implementation not intended to be compatible with current bitcoin protocols.
 
 ## Designs
 ### Roles
