@@ -12,6 +12,7 @@ import (
 
 	"github.com/btcsuite/btcutil/base58"
 	"github.com/cjc7373/bitcoin_go/internal/utils"
+	"github.com/cjc7373/bitcoin_go/internal/wallet"
 )
 
 var (
@@ -19,6 +20,15 @@ var (
 	ErrInvalidSignature = errors.New("invalid input signature")
 	ErrInvalidHash      = errors.New("invalid transaction hash")
 )
+
+type ErrNotEnoughFunds struct {
+	need  int64
+	found int64
+}
+
+func (err ErrNotEnoughFunds) Error() string {
+	return fmt.Sprintf("the wallet do not have enough funds, need %v, found %v", err.need, err.found)
+}
 
 type TXInput struct {
 	Txid      []byte // ID of tx this input refers
@@ -52,8 +62,8 @@ type Transaction struct {
 	Vout []TXOutput
 }
 
-// Hash returns the hash of the Transaction
-func (tx *Transaction) Hash() []byte {
+// hash returns the hash of the Transaction
+func (tx *Transaction) hash() []byte {
 	var hash [32]byte
 
 	txCopy := *tx
@@ -85,8 +95,34 @@ func NewCoinbaseTransaction(to string, data []byte) *Transaction {
 	input := TXInput{nil, -1, nil, data}
 	output := NewTXOutput(subsidy, to)
 	tx := Transaction{nil, []TXInput{input}, []TXOutput{*output}}
-	tx.ID = tx.Hash()
+	tx.ID = tx.hash()
 	return &tx
+}
+
+func NewTransaction(w *wallet.Wallet, to string, amount int64, uxtoSet *UTXOSet) (*Transaction, error) {
+	unspentOutputs, foundAmount := uxtoSet.FindSpendableOutputs(utils.HashPubKey(w.PublicKey), amount)
+	if foundAmount < amount {
+		return nil, ErrNotEnoughFunds{need: amount, found: foundAmount}
+	}
+
+	var inputs []TXInput
+	for txID, outputs := range unspentOutputs {
+		for _, output := range outputs {
+			inputs = append(inputs, TXInput{
+				Txid:      []byte(txID),
+				VoutIndex: output.OriginalIndex,
+			})
+		}
+	}
+	outputs := []TXOutput{{amount, nil}}
+	// take the change
+	if foundAmount > amount {
+		outputs = append(outputs, TXOutput{foundAmount - amount, utils.HashPubKey(w.PublicKey)})
+	}
+	tx := Transaction{nil, inputs, outputs}
+	tx.Sign(w.PrivateKey)
+	tx.ID = tx.hash()
+	return &tx, nil
 }
 
 // IsCoinbase checks whether the transaction is coinbase
@@ -118,20 +154,17 @@ func (tx *Transaction) String() string {
 	return strings.Join(lines, "\n")
 }
 
-func (tx *Transaction) Sign(privKey ecdsa.PrivateKey, prevTXs map[string]Transaction) error {
+// in Sign() function we do not need to verify the pubkey of vin
+// because the transaction will always be valid
+func (tx *Transaction) Sign(privKey ecdsa.PrivateKey) error {
 	if tx.IsCoinbase() {
 		return nil
 	}
 
 	// bitcoin actually signs a trimmed copy of a tx, I don't know why
 	// here I only sign an input
-	for index, vinCopy := range tx.Vin {
-		prevTx := prevTXs[string(vinCopy.Txid)]
-		prevOutput := prevTx.Vout[vinCopy.VoutIndex]
+	for index := range tx.Vin {
 		pubkey := utils.EncodePubKey(&privKey)
-		if !bytes.Equal(prevOutput.PubKeyHash, utils.HashPubKey(pubkey)) {
-			return ErrPubKeyMismatch
-		}
 
 		tx.Vin[index].Signature = nil
 		tx.Vin[index].PubKey = pubkey
@@ -149,12 +182,23 @@ func (tx *Transaction) Sign(privKey ecdsa.PrivateKey, prevTXs map[string]Transac
 	return nil
 }
 
-func (tx *Transaction) Verify(prevTXs map[string]Transaction) (bool, error) {
+func findOutputInUXTO(unspentOutputs *map[string][]TXOutputWithMetadata, txid string, outputIndex int) *TXOutputWithMetadata {
+	for id, outputs := range *unspentOutputs {
+		for _, output := range outputs {
+			if txid == id && output.OriginalIndex == outputIndex {
+				return &output
+			}
+		}
+	}
+	return nil
+}
+
+func (tx *Transaction) Verify(prevOutputs map[string][]TXOutputWithMetadata) (bool, error) {
 	if tx.IsCoinbase() {
 		return true, nil
 	}
 
-	txHash := tx.Hash()
+	txHash := tx.hash()
 	if !bytes.Equal(tx.ID, txHash) {
 		return false, ErrInvalidHash
 	}
@@ -163,7 +207,7 @@ func (tx *Transaction) Verify(prevTXs map[string]Transaction) (bool, error) {
 		sig := vinCopy.Signature
 		vinCopy.Signature = nil
 
-		prevOutput := prevTXs[string(vinCopy.Txid)].Vout[vinCopy.VoutIndex]
+		prevOutput := findOutputInUXTO(&prevOutputs, string(vinCopy.Txid), vinCopy.VoutIndex)
 		if !bytes.Equal(prevOutput.PubKeyHash, utils.HashPubKey(vinCopy.PubKey)) {
 			return false, ErrPubKeyMismatch
 		}

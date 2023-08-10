@@ -15,30 +15,33 @@ func TestSign(t *testing.T) {
 	w2 := wallet.NewWallet()
 
 	coinbaseTx := NewCoinbaseTransaction(w1.GetAddress(), nil)
-	prevTXs := make(map[string]Transaction)
-	prevTXs[string(coinbaseTx.ID)] = *coinbaseTx
+	unspentOutputs := make(map[string][]TXOutputWithMetadata)
+	unspentOutputs[string(coinbaseTx.ID)] = append(unspentOutputs[string(coinbaseTx.ID)], TXOutputWithMetadata{
+		TXOutput:      coinbaseTx.Vout[0],
+		OriginalIndex: 0,
+	})
 
 	in := TXInput{Txid: coinbaseTx.ID, VoutIndex: 0}
 	out := TXOutput{Value: 100, PubKeyHash: utils.HashPubKey(w2.PublicKey)}
 
 	tx := Transaction{nil, []TXInput{in}, []TXOutput{out}}
-	err := tx.Sign(w1.PrivateKey, prevTXs)
-	tx.ID = tx.Hash()
+	err := tx.Sign(w1.PrivateKey)
+	tx.ID = tx.hash()
 	assert.Nil(err)
 
-	res, err := tx.Verify(prevTXs)
+	res, err := tx.Verify(unspentOutputs)
 	assert.True(res)
 	assert.Nil(err)
 
 	// we tamper a signature, leaving the tx hash incorrect
 	tx.Vin[0].Signature = tx.Vin[0].Signature[1:]
-	res, err = tx.Verify(prevTXs)
+	res, err = tx.Verify(unspentOutputs)
 	assert.False(res)
 	assert.Equal(ErrInvalidHash, err)
 
 	// we correct the hash
-	tx.ID = tx.Hash()
-	res, err = tx.Verify(prevTXs)
+	tx.ID = tx.hash()
+	res, err = tx.Verify(unspentOutputs)
 	assert.False(res)
 	assert.Equal(ErrInvalidSignature, err)
 }

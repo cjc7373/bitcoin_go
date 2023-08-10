@@ -88,11 +88,13 @@ func TestFindUTXO(t *testing.T) {
 
 	bc := newFakeBlockchain()
 	utxoSet := UTXOSet{Blockchain: bc}
-	utxo := utxoSet.FindUTXO()
+	utxo := utxoSet.findUTXO()
 	for k, v := range *utxo {
 		fmt.Println(k, v)
 	}
-	assert.Equal([]int{0}, (*utxo)["4"])
-	assert.Equal([]int{0}, (*utxo)["3"])
-	assert.Equal([]int{1, 3}, (*utxo)["2"])
+	assert.Equal(0, (*utxo)["4"][0].OriginalIndex)
+	assert.Equal(0, (*utxo)["3"][0].OriginalIndex)
+	assert.Equal(1, (*utxo)["2"][0].OriginalIndex)
+	assert.Equal(3, (*utxo)["2"][1].OriginalIndex)
+
 }
