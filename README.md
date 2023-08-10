@@ -22,3 +22,4 @@ This project is only a simplified bitcoin implementation not intended to be comp
 - [Bitcoin whitepaper](https://bitcoin.org/bitcoin.pdf)
 
 ## Issues
+- TODO: when verifying a block, need to check if an output is spent twice

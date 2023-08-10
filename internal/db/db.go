@@ -15,6 +15,3 @@ func GetDB(conf *utils.Config) *bolt.DB {
 
 	return db
 }
-
-// 'b' + 32-byte block hash -> block data
-// "last_block" -> the hash of the last block in a chain

@@ -15,6 +15,10 @@ import (
 const blockBucket = "block"
 const lastBlock = "last_block"
 
+// in block bucket, we'll have:
+// 32-byte block hash -> block data, encoded by json
+// "last_block" -> the hash of the last block in a chain
+
 type Block struct {
 	Timestamp     int64 // a Unix timestamp
 	Transactions  []Transaction
@@ -35,9 +39,10 @@ func NewBlock(txs *[]Transaction, prevBlockHash []byte) *Block {
 }
 
 type Blockchain struct {
-	TipHash []byte // top block hash
-	Height  int64
-	DB      *bolt.DB
+	TipHash  []byte // top block hash
+	Height   int64
+	DB       *bolt.DB
+	Iterator func() BlockchainIterator
 }
 
 func (bc *Blockchain) AddBlock(txs *[]Transaction) {
@@ -69,36 +74,62 @@ func (bc *Blockchain) AddBlock(txs *[]Transaction) {
 	}
 }
 
-func (bc *Blockchain) PrintChain() {
-	fmt.Println("Printing chain...")
-	err := bc.DB.View(func(tx *bolt.Tx) error {
+// FIXME: this interface is mainly for the ease of testing
+// I wonder if there's a better way
+type BlockchainIterator interface {
+	Next() *Block
+}
+
+type BlockchainIteratorImpl struct {
+	curHash []byte
+	db      *bolt.DB
+}
+
+func (bci *BlockchainIteratorImpl) Next() *Block {
+	if len(bci.curHash) == 0 {
+		return nil
+	}
+
+	var block Block
+	err := bci.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(blockBucket))
 
-		var block Block
-		// form a fake block
-		block.PrevBlockHash = bc.TipHash
-		// TODO: why block.PrevBlockHash != nil doesn't work?
-		for len(block.PrevBlockHash) != 0 {
-			data := b.Get(block.PrevBlockHash)
-			err := json.Unmarshal(data, &block)
-			if err != nil {
-				panic(err)
-			}
-			fmt.Printf("Prev. hash: %x\n", block.PrevBlockHash)
-			fmt.Printf("Transactions: \n")
-			for _, tx := range block.Transactions {
-				fmt.Println(&tx)
-			}
-			fmt.Printf("Hash: %x\n", block.Hash)
-			fmt.Println()
+		data := b.Get(bci.curHash)
+		err := json.Unmarshal(data, &block)
+		if err != nil {
+			return err
 		}
 
 		return nil
 	})
-
 	if err != nil {
 		panic(err)
 	}
+
+	bci.curHash = block.PrevBlockHash
+	return &block
+}
+
+func (bc *Blockchain) PrintChain() {
+	fmt.Println("Printing chain...")
+	iter := bc.Iterator()
+
+	for {
+		block := iter.Next()
+
+		if block == nil {
+			break
+		}
+
+		fmt.Printf("Prev. hash: %x\n", block.PrevBlockHash)
+		fmt.Printf("Transactions: \n")
+		for _, tx := range block.Transactions {
+			fmt.Println(&tx)
+		}
+		fmt.Printf("Hash: %x\n", block.Hash)
+		fmt.Println()
+	}
+
 }
 
 func NewGenesisBlock(to string) *Block {
@@ -146,5 +177,9 @@ func NewBlockchain(conf *utils.Config, to string) *Blockchain {
 		panic(err)
 	}
 
-	return &Blockchain{TipHash: tip, DB: bolt_db}
+	blockchainIterator := func() BlockchainIterator {
+		return &BlockchainIteratorImpl{curHash: tip, db: bolt_db}
+	}
+
+	return &Blockchain{TipHash: tip, DB: bolt_db, Iterator: blockchainIterator}
 }
