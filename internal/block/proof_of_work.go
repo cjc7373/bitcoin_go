@@ -3,6 +3,7 @@ package block
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"math"
 	"math/big"
@@ -33,10 +34,14 @@ func NewProofOfWork(b *Block) *ProofOfWork {
 }
 
 func (pow *ProofOfWork) prepareData(nonce int) []byte {
+	txData, err := json.Marshal(pow.block.Transactions)
+	if err != nil {
+		panic(err)
+	}
 	data := bytes.Join(
 		[][]byte{
 			pow.block.PrevBlockHash,
-			pow.block.Data,
+			txData,
 			utils.IntToHex(pow.block.Timestamp),
 			utils.IntToHex(int64(targetBits)),
 			utils.IntToHex(int64(nonce)),
@@ -52,7 +57,10 @@ func (pow *ProofOfWork) Run() (int, []byte) {
 	var hash [32]byte
 	nonce := 0
 
-	fmt.Printf("Mining the block containing \"%s\"\n", pow.block.Data)
+	fmt.Printf("Mining the block containing the following txs:\n")
+	for _, tx := range pow.block.Transactions {
+		fmt.Println(&tx)
+	}
 	for nonce < maxNonce {
 		data := pow.prepareData(nonce)
 		// we won't use key derivation functions like PBKDF2 and scrypt for simplicity

@@ -14,6 +14,12 @@ import (
 	"github.com/cjc7373/bitcoin_go/internal/utils"
 )
 
+var (
+	ErrPubKeyMismatch   = errors.New("pubkey not equal to previous output's pubkey hash")
+	ErrInvalidSignature = errors.New("invalid input signature")
+	ErrInvalidHash      = errors.New("invalid transaction hash")
+)
+
 type TXInput struct {
 	Txid      []byte // ID of tx this input refers
 	VoutIndex int    // index of an output in the tx
@@ -66,14 +72,17 @@ const subsidy = 10000
 
 // create a new tx, which has an output to reward the miner
 // this output
-func NewCoinbaseTransaction(to string) *Transaction {
-	// create an empty input to make the hash change every time
-	randData := make([]byte, 10)
-	_, err := rand.Read(randData)
-	if err != nil {
-		panic(err)
+func NewCoinbaseTransaction(to string, data []byte) *Transaction {
+	if data != nil {
+		// create an empty input to make the hash change every time
+		data = make([]byte, 10)
+		_, err := rand.Read(data)
+		if err != nil {
+			panic(err)
+		}
 	}
-	input := TXInput{nil, -1, nil, randData}
+
+	input := TXInput{nil, -1, nil, data}
 	output := NewTXOutput(subsidy, to)
 	tx := Transaction{nil, []TXInput{input}, []TXOutput{*output}}
 	tx.ID = tx.Hash()
@@ -103,7 +112,7 @@ func (tx *Transaction) String() string {
 	for i, output := range tx.Vout {
 		lines = append(lines, fmt.Sprintf("     Output %d:", i))
 		lines = append(lines, fmt.Sprintf("       Value:  %d", output.Value))
-		lines = append(lines, fmt.Sprintf("       Script: %x", output.PubKeyHash))
+		lines = append(lines, fmt.Sprintf("       PubKeyHash: %x", output.PubKeyHash))
 	}
 
 	return strings.Join(lines, "\n")
@@ -116,17 +125,17 @@ func (tx *Transaction) Sign(privKey ecdsa.PrivateKey, prevTXs map[string]Transac
 
 	// bitcoin actually signs a trimmed copy of a tx, I don't know why
 	// here I only sign an input
-	for _, vin := range tx.Vin {
-		prevTx := prevTXs[string(vin.Txid)]
-		prevOutput := prevTx.Vout[vin.VoutIndex]
+	for index, vinCopy := range tx.Vin {
+		prevTx := prevTXs[string(vinCopy.Txid)]
+		prevOutput := prevTx.Vout[vinCopy.VoutIndex]
 		pubkey := utils.EncodePubKey(&privKey)
 		if !bytes.Equal(prevOutput.PubKeyHash, utils.HashPubKey(pubkey)) {
-			return errors.New("pubkey not equal to previous output's pubkey hash")
+			return ErrPubKeyMismatch
 		}
 
-		vin.Signature = nil
-		vin.PubKey = pubkey
-		data, err := json.Marshal(&vin)
+		tx.Vin[index].Signature = nil
+		tx.Vin[index].PubKey = pubkey
+		data, err := json.Marshal(&tx.Vin[index])
 		if err != nil {
 			panic(err)
 		}
@@ -135,23 +144,28 @@ func (tx *Transaction) Sign(privKey ecdsa.PrivateKey, prevTXs map[string]Transac
 		if err != nil {
 			panic(err)
 		}
-		vin.Signature = sig
+		tx.Vin[index].Signature = sig
 	}
 	return nil
 }
 
-func (tx *Transaction) Verify(prevTXs map[string]Transaction) bool {
+func (tx *Transaction) Verify(prevTXs map[string]Transaction) (bool, error) {
 	if tx.IsCoinbase() {
-		return true
+		return true, nil
 	}
 
-	for _, vin := range tx.Vin {
-		vinCopy := vin
+	txHash := tx.Hash()
+	if !bytes.Equal(tx.ID, txHash) {
+		return false, ErrInvalidHash
+	}
+
+	for _, vinCopy := range tx.Vin {
+		sig := vinCopy.Signature
 		vinCopy.Signature = nil
 
-		prevOutput := prevTXs[string(vin.Txid)].Vout[vin.VoutIndex]
-		if !bytes.Equal(prevOutput.PubKeyHash, utils.HashPubKey(vin.PubKey)) {
-			return false
+		prevOutput := prevTXs[string(vinCopy.Txid)].Vout[vinCopy.VoutIndex]
+		if !bytes.Equal(prevOutput.PubKeyHash, utils.HashPubKey(vinCopy.PubKey)) {
+			return false, ErrPubKeyMismatch
 		}
 
 		data, err := json.Marshal(&vinCopy)
@@ -159,9 +173,9 @@ func (tx *Transaction) Verify(prevTXs map[string]Transaction) bool {
 			panic(err)
 		}
 		hash := sha256.Sum256(data)
-		if !ecdsa.VerifyASN1(utils.ParsePubKey(vin.PubKey), hash[:], vin.Signature) {
-			return false
+		if !ecdsa.VerifyASN1(utils.ParsePubKey(vinCopy.PubKey), hash[:], sig) {
+			return false, ErrInvalidSignature
 		}
 	}
-	return true
+	return true, nil
 }

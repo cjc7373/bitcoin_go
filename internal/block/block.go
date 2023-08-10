@@ -17,14 +17,14 @@ const lastBlock = "last_block"
 
 type Block struct {
 	Timestamp     int64 // a Unix timestamp
-	Data          []byte
+	Transactions  []Transaction
 	PrevBlockHash []byte
 	Hash          []byte
 	Nonce         int
 }
 
-func NewBlock(data string, prevBlockHash []byte) *Block {
-	block := &Block{time.Now().Unix(), []byte(data), prevBlockHash, []byte{}, 0}
+func NewBlock(txs *[]Transaction, prevBlockHash []byte) *Block {
+	block := &Block{time.Now().Unix(), *txs, prevBlockHash, []byte{}, 0}
 	pow := NewProofOfWork(block)
 	nonce, hash := pow.Run()
 
@@ -40,8 +40,8 @@ type Blockchain struct {
 	DB      *bolt.DB
 }
 
-func (bc *Blockchain) AddBlock(data string) {
-	newBlock := NewBlock(data, bc.TipHash)
+func (bc *Blockchain) AddBlock(txs *[]Transaction) {
+	newBlock := NewBlock(txs, bc.TipHash)
 	err := bc.DB.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(blockBucket))
 		data, err := json.Marshal(newBlock)
@@ -85,7 +85,10 @@ func (bc *Blockchain) PrintChain() {
 				panic(err)
 			}
 			fmt.Printf("Prev. hash: %x\n", block.PrevBlockHash)
-			fmt.Printf("Data: %s\n", block.Data)
+			fmt.Printf("Transactions: \n")
+			for _, tx := range block.Transactions {
+				fmt.Println(&tx)
+			}
 			fmt.Printf("Hash: %x\n", block.Hash)
 			fmt.Println()
 		}
@@ -98,11 +101,11 @@ func (bc *Blockchain) PrintChain() {
 	}
 }
 
-func NewGenesisBlock() *Block {
-	return NewBlock("Genesis Block", []byte{})
+func NewGenesisBlock(to string) *Block {
+	return NewBlock(&[]Transaction{*NewCoinbaseTransaction(to, []byte("Genesis Block"))}, nil)
 }
 
-func NewBlockchain(conf *utils.Config) *Blockchain {
+func NewBlockchain(conf *utils.Config, to string) *Blockchain {
 	bolt_db := db.GetDB(conf)
 	var tip []byte
 
@@ -110,7 +113,7 @@ func NewBlockchain(conf *utils.Config) *Blockchain {
 		b := tx.Bucket([]byte(blockBucket))
 
 		if b == nil {
-			genesis := NewGenesisBlock()
+			genesis := NewGenesisBlock(to)
 			log.Printf("Created genesis block with hash %x\n", genesis.Hash)
 			b, err := tx.CreateBucket([]byte(blockBucket))
 			if err != nil {

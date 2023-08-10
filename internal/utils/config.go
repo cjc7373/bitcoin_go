@@ -9,23 +9,23 @@ import (
 )
 
 type Config struct {
-	DBPath string
+	DBPath  string
+	Wallets map[string]string
+}
+
+func NewDefaultConfig() *Config {
+	return &Config{
+		DBPath:  "blockchain.db",
+		Wallets: map[string]string{},
+	}
 }
 
 func ParseConfig(configPath string) *Config {
 	var conf Config
 	data, err := os.ReadFile(configPath)
 	if errors.Is(err, fs.ErrNotExist) {
-		conf.DBPath = "blockchain.db"
-
-		newData, err := yaml.Marshal(&conf)
-		if err != nil {
-			panic(err)
-		}
-		err = os.WriteFile(configPath, newData, 0644)
-		if err != nil {
-			panic(err)
-		}
+		conf = *NewDefaultConfig()
+		conf.WriteToFile(configPath)
 	} else if err != nil {
 		panic(err)
 	} else {
@@ -35,5 +35,20 @@ func ParseConfig(configPath string) *Config {
 		}
 	}
 
+	if conf.Wallets == nil {
+		conf.Wallets = make(map[string]string)
+	}
+
 	return &conf
+}
+
+func (conf *Config) WriteToFile(configPath string) {
+	newData, err := yaml.Marshal(&conf)
+	if err != nil {
+		panic(err)
+	}
+	err = os.WriteFile(configPath, newData, 0644)
+	if err != nil {
+		panic(err)
+	}
 }
