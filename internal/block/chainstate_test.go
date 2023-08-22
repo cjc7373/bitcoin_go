@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/cjc7373/bitcoin_go/internal/utils"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -12,11 +13,15 @@ type dumbIterator struct {
 	blocks []*Block
 }
 
-func (it *dumbIterator) Next() *Block {
+func (it *dumbIterator) Next() bool {
 	if it.cur < 0 {
-		return nil
+		return false
 	}
 	it.cur -= 1
+	return true
+}
+
+func (it *dumbIterator) Elem() *Block {
 	return it.blocks[it.cur+1]
 }
 
@@ -76,7 +81,7 @@ func newFakeBlockchain() *Blockchain {
 		TipHash: b4.Hash,
 		Height:  4,
 		DB:      nil,
-		Iterator: func() BlockchainIterator {
+		NewBlockIterator: func() utils.Iterator[*Block] {
 			return &dumbIterator{cur: 3, blocks: []*Block{b1, b2, b3, b4}}
 		},
 	}

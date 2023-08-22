@@ -39,10 +39,10 @@ func NewBlock(txs *[]Transaction, prevBlockHash []byte) *Block {
 }
 
 type Blockchain struct {
-	TipHash  []byte // top block hash
-	Height   int64
-	DB       *bolt.DB
-	Iterator func() BlockchainIterator
+	TipHash          []byte // top block hash
+	Height           int64
+	DB               *bolt.DB
+	NewBlockIterator func() utils.Iterator[*Block]
 }
 
 func (bc *Blockchain) AddBlock(txs *[]Transaction) {
@@ -76,20 +76,20 @@ func (bc *Blockchain) AddBlock(txs *[]Transaction) {
 
 // FIXME: this interface is mainly for the ease of testing
 // I wonder if there's a better way
-type BlockchainIterator interface {
-	Next() *Block
-}
-
-type BlockchainIteratorImpl struct {
+type BlockchainIterator struct {
 	curHash []byte
 	db      *bolt.DB
 }
 
-func (bci *BlockchainIteratorImpl) Next() *Block {
+func (bci *BlockchainIterator) Next() bool {
 	if len(bci.curHash) == 0 {
-		return nil
+		return false
+	} else {
+		return true
 	}
+}
 
+func (bci *BlockchainIterator) Elem() *Block {
 	var block Block
 	err := bci.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(blockBucket))
@@ -112,14 +112,10 @@ func (bci *BlockchainIteratorImpl) Next() *Block {
 
 func (bc *Blockchain) PrintChain() {
 	fmt.Println("Printing chain...")
-	iter := bc.Iterator()
+	iter := bc.NewBlockIterator()
 
-	for {
-		block := iter.Next()
-
-		if block == nil {
-			break
-		}
+	for iter.Next() {
+		block := iter.Elem()
 
 		fmt.Printf("Prev. hash: %x\n", block.PrevBlockHash)
 		fmt.Printf("Transactions: \n")
@@ -177,9 +173,9 @@ func NewBlockchain(conf *utils.Config, to string) *Blockchain {
 		panic(err)
 	}
 
-	blockchainIterator := func() BlockchainIterator {
-		return &BlockchainIteratorImpl{curHash: tip, db: bolt_db}
+	blockchainIterator := func() utils.Iterator[*Block] {
+		return &BlockchainIterator{curHash: tip, db: bolt_db}
 	}
 
-	return &Blockchain{TipHash: tip, DB: bolt_db, Iterator: blockchainIterator}
+	return &Blockchain{TipHash: tip, DB: bolt_db, NewBlockIterator: blockchainIterator}
 }

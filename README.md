@@ -24,3 +24,4 @@ This project is only a simplified bitcoin implementation not intended to be comp
 ## Issues
 - TODO: when verifying a block, need to check if an output is spent twice
 - when to update uxto set?
+- we can't use an UTXO twice in one block

@@ -62,16 +62,13 @@ func (u UTXOSet) FindSpendableOutputs(pubkeyHash []byte, amount int64) (unspentO
 
 // return a map of UTXOs, key is tx id, value is a set of TXOutputs
 func (u UTXOSet) findUTXO() *map[string][]TXOutputWithMetadata {
-	blockIter := u.Blockchain.Iterator()
+	blockIter := u.Blockchain.NewBlockIterator()
 
 	UTXO := make(map[string][]TXOutputWithMetadata) // key is tx id, value is a set of VoutIndex
 	spentOutputs := make(map[string][]int)          // key is tx id, value is a set of VoutIndex
 
-	for {
-		block := blockIter.Next()
-		if block == nil {
-			break
-		}
+	for blockIter.Next() {
+		block := blockIter.Elem()
 
 		for _, tx := range block.Transactions {
 			id := string(tx.ID)
