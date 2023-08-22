@@ -4,8 +4,7 @@ This project is only a simplified bitcoin implementation not intended to be comp
 
 ## Designs
 ### Roles
-- Node: stores the whole chain and use PoW to validate new transactions
-- Wallet: sends/receives transactions
+There are no roles such as miner, full nodes and SPVs. Each node will store the whole chain, do PoWs and validate blocks. There is a seperate Cli tool to act like a wallet to send/receive coins.
 
 ### Tech Stack
 - Serialization: protobuf, this is used both for network traffic and data persistence
@@ -20,6 +19,10 @@ This project is only a simplified bitcoin implementation not intended to be comp
 
 ## References
 - [Bitcoin whitepaper](https://bitcoin.org/bitcoin.pdf)
+
+## Things which are not implemented
+- Merkle Tree
+- Scripts
 
 ## Issues
 - TODO: when verifying a block, need to check if an output is spent twice

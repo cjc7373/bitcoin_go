@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"time"
 
 	"github.com/cjc7373/bitcoin_go/internal/utils"
 )
@@ -17,6 +18,10 @@ import (
 // We won’t implement a target adjusting algorithm for simplicity
 const targetBits = 16
 const maxNonce = math.MaxInt64
+
+// in nodes we will deliberately add some latency to make pow slow
+// so that it won't actually consume much CPU time
+var PowSleepTime time.Duration = 0
 
 type ProofOfWork struct {
 	block  *Block
@@ -52,6 +57,12 @@ func (pow *ProofOfWork) prepareData(nonce int) []byte {
 	return data
 }
 
+func (pow *ProofOfWork) setNonce(data []byte, nonce int) []byte {
+	time.Sleep(PowSleepTime)
+	trimmedData := data[:len(data)-8]
+	return append(trimmedData, utils.IntToHex(int64(nonce))...)
+}
+
 func (pow *ProofOfWork) Run() (int, []byte) {
 	var hashInt big.Int
 	var hash [32]byte
@@ -61,8 +72,9 @@ func (pow *ProofOfWork) Run() (int, []byte) {
 	for _, tx := range pow.block.Transactions {
 		fmt.Println(&tx)
 	}
+	data := pow.prepareData(nonce)
 	for nonce < maxNonce {
-		data := pow.prepareData(nonce)
+		data := pow.setNonce(data, nonce)
 		// we won't use key derivation functions like PBKDF2 and scrypt for simplicity
 		hash = sha256.Sum256(data)
 		hashInt.SetBytes(hash[:])
