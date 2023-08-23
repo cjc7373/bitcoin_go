@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+option go_package = "github.com/cjc7373/bitcoin_go/internal/network/proto";
+
+service Discovery {
+    rpc RequestNodes(NodeRequest) returns (Empty) {}
+    rpc BroadcastNodes(NodeBroadcast) returns (Empty) {}
+}
+
+message NodeRequest {
+    string name = 1;
+}
+
+message NodeBroadcast {
+    repeated Node nodes = 1;
+    uint32 TTL = 2;
+}
+
+message Empty {}
+
+message Node {
+    string address = 1;
+    string name = 2;
+}

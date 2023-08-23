@@ -19,6 +19,7 @@ There are no roles such as miner, full nodes and SPVs. Each node will store the 
 
 ## References
 - [Bitcoin whitepaper](https://bitcoin.org/bitcoin.pdf)
+- [Bitcoin Protocol Documentation](https://en.bitcoin.it/wiki/Protocol_documentation)
 
 ## Things which are not implemented
 - Merkle Tree
