@@ -5,28 +5,44 @@ import (
 	"errors"
 	"io/fs"
 	"os"
+	"path"
 
 	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
-	DBPath  string
-	Wallets map[string]string
+	DBPath     string
+	ListenAddr string
+	NodeName   string
+	Wallets    map[string]string
+
+	dataDir string // keep this field private to avoid writing it to config file
+}
+
+func (c *Config) GetDataDir() string {
+	return c.dataDir
 }
 
 func NewDefaultConfig() *Config {
 	return &Config{
-		DBPath:  "blockchain.db",
-		Wallets: map[string]string{},
+		DBPath:     "blockchain.db",
+		ListenAddr: ":12000",
+		NodeName:   "defaultNode",
+		Wallets:    map[string]string{},
 	}
 }
 
-func ParseConfig(configPath string) *Config {
+func ParseConfig(dataDir string) *Config {
+	configPath := path.Join(dataDir, "config.yaml")
 	var conf Config
 	data, err := os.ReadFile(configPath)
 	if errors.Is(err, fs.ErrNotExist) {
+		err = os.MkdirAll(dataDir, 0755)
+		if err != nil {
+			panic(err)
+		}
 		conf = *NewDefaultConfig()
-		conf.WriteToFile(configPath)
+		conf.writeToFile(configPath)
 	} else if err != nil {
 		panic(err)
 	} else {
@@ -39,11 +55,17 @@ func ParseConfig(configPath string) *Config {
 	if conf.Wallets == nil {
 		conf.Wallets = make(map[string]string)
 	}
+	conf.dataDir = configPath
 
 	return &conf
 }
 
-func (conf *Config) WriteToFile(configPath string) {
+// write config back to file
+func (conf *Config) Write() {
+	conf.writeToFile(conf.dataDir)
+}
+
+func (conf *Config) writeToFile(configPath string) {
 	newData, err := yaml.Marshal(&conf)
 	if err != nil {
 		panic(err)

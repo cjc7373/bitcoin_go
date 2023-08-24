@@ -15,8 +15,9 @@ import (
 func TestDiscovery(t *testing.T) {
 	serverAddr := ":12200"
 	service := NewService()
+	done := make(chan error)
 	go func() {
-		service.Serve(serverAddr)
+		service.Serve(serverAddr, done)
 	}()
 
 	// wait server start

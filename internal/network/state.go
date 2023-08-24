@@ -112,11 +112,11 @@ func (h *statsHandler) HandleConn(ctx context.Context, connStats stats.ConnStats
 	}
 }
 
-func (s *service) Serve(address string) {
+func (s *service) Serve(address string, done chan error) {
 	lis, _ := net.Listen("tcp", address)
 	opts := []grpc.ServerOption{grpc.StatsHandler(&statsHandler{service: s})}
 	grpcServer := grpc.NewServer(opts...)
 	discovery := discoveryServer{s: s}
 	proto.RegisterDiscoveryServer(grpcServer, &discovery)
-	grpcServer.Serve(lis)
+	done <- grpcServer.Serve(lis)
 }

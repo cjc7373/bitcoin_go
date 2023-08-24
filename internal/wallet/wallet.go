@@ -21,6 +21,8 @@ type Wallets struct {
 	Wallets map[string]*Wallet
 }
 
+const DefatltWalletName = "default"
+
 func NewWallet() *Wallet {
 	private, public := newKeyPair()
 	wallet := Wallet{private, public}

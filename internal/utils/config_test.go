@@ -14,19 +14,21 @@ func TestYaml(t *testing.T) {
 		A string
 		B []byte
 		C map[string]string
+
+		unexported string
 	}
 
-	data := T{"xxx", []byte("xaaaa"), map[string]string{"key": "v1", "k3": "v3"}}
+	data := T{"xxx", []byte("xaaaa"), map[string]string{"key": "v1", "k3": "v3"}, "foo"}
 	out, _ := yaml.Marshal(data)
 	fmt.Println(out)
 	var m T
-	err := yaml.Unmarshal([]byte{}, &m)
+	err := yaml.Unmarshal(out, &m)
 	fmt.Println(err, m)
 }
 
 func TestParseConfig(t *testing.T) {
 	assert := assert.New(t)
-	config := ParseConfig("./testdata/test_conf.yaml")
+	config := ParseConfig("./testdata")
 
 	assert.Equal("blockchain.db", config.DBPath)
 	assert.Equal("foo", strings.TrimSpace(config.Wallets["default"]))

@@ -23,3 +23,21 @@ func (s *service) broadcastNodes(ttl uint32) {
 		})
 	}
 }
+
+func (s *service) ConnectFirstNode(remoteAddress string, localName string) error {
+	_, err := s.connectNode(remoteAddress, "")
+	if err != nil {
+		return err
+	}
+
+	s.RLock()
+	client := s.connectedNodes[remoteAddress].DiscoveryClient
+	s.RUnlock()
+	_, err = client.RequestNodes(context.Background(), &proto.NodeRequest{
+		Name: localName,
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}

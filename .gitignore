@@ -1,5 +1,6 @@
 config.yaml
 blockchain.db
+data/
 
 # tests
 cover.out

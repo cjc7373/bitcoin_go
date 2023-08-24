@@ -23,7 +23,7 @@ func main() {
 		w := wallet.NewWallet()
 		fmt.Printf("Creating new wallet with address %v\n", w.GetAddress())
 		conf.Wallets[defatltWalletName] = string(w.EncodeToPEM())
-		conf.WriteToFile(*configPath)
+		// conf.WriteToFile(*configPath)
 	} else {
 		w = *wallet.NewWalletFromPEM([]byte(conf.Wallets[defatltWalletName]))
 		fmt.Printf("Using existing wallet with address %v\n", w.GetAddress())
