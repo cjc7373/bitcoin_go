@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"errors"
 	"io/fs"
 	"os"
@@ -51,4 +52,14 @@ func (conf *Config) WriteToFile(configPath string) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+var ConfigKey struct{}
+
+func GetConfigFromContext(ctx context.Context) *Config {
+	config, ok := ctx.Value(&ConfigKey).(*Config)
+	if !ok {
+		panic("cannot get config from context")
+	}
+	return config
 }
