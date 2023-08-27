@@ -2,7 +2,7 @@ syntax = "proto3";
 
 option go_package = "github.com/cjc7373/bitcoin_go/internal/network/proto";
 
-service Discovery {
+service Bitcoin {
     rpc RequestNodes(Node) returns (Empty) {}
     rpc BroadcastNodes(NodeBroadcast) returns (Empty) {}
 }

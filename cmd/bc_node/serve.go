@@ -5,6 +5,8 @@ import (
 	"log"
 
 	"github.com/cjc7373/bitcoin_go/internal/network"
+	"github.com/cjc7373/bitcoin_go/internal/network/rpc_client"
+	"github.com/cjc7373/bitcoin_go/internal/network/rpc_server"
 	"github.com/cjc7373/bitcoin_go/internal/utils"
 	"github.com/cjc7373/bitcoin_go/internal/wallet"
 	"github.com/spf13/cobra"
@@ -19,12 +21,12 @@ func RunServe(cmd *cobra.Command, args []string) {
 
 	service := network.NewService()
 	done := make(chan error)
-	go service.Serve(config.ListenAddr, done)
+	go rpc_server.Serve(service, config.ListenAddr, done)
 
 	if genesis {
 		fmt.Println(w)
 	} else {
-		service.ConnectFirstNode(connectTo, config.ListenAddr, config.NodeName)
+		rpc_client.ConnectFirstNode(service, connectTo, config.ListenAddr, config.NodeName)
 	}
 	log.Println(<-done)
 }

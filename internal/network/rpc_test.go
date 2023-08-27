@@ -1,47 +1,44 @@
-package network
+package network_test
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
 
-	"github.com/cjc7373/bitcoin_go/internal/network/proto"
+	"github.com/cjc7373/bitcoin_go/internal/network"
+	"github.com/cjc7373/bitcoin_go/internal/network/rpc_client"
+	"github.com/cjc7373/bitcoin_go/internal/network/rpc_server"
 	"github.com/stretchr/testify/assert"
-	grpc "google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 func TestDiscovery(t *testing.T) {
 	serverAddr1 := ":12200"
-	service1 := NewService()
+	service1 := network.NewService()
 	done := make(chan error)
 	go func() {
-		service1.Serve(serverAddr1, done)
+		rpc_server.Serve(service1, serverAddr1, done)
 	}()
 
 	serverAddr2 := ":12201"
-	service2 := NewService()
+	service2 := network.NewService()
 	go func() {
-		service2.Serve(serverAddr2, done)
+		rpc_server.Serve(service2, serverAddr2, done)
 	}()
 
 	// wait server start
 	time.Sleep(time.Microsecond * 100)
 
-	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithNoProxy()}
-	conn, err := grpc.Dial(serverAddr1, opts...)
+	err := rpc_client.ConnectFirstNode(service2, serverAddr1, serverAddr2, "service2")
 	assert.Nil(t, err)
 
-	client := proto.NewDiscoveryClient(conn)
-	_, err = client.RequestNodes(context.Background(), &proto.Node{Name: "foo", Address: serverAddr2})
-	fmt.Println(err)
-	fmt.Println(service1.connectedNodes)
+	s2Nodes := service2.GetConnectedNodes()
+	fmt.Println(s2Nodes)
 	assert.Nil(t, err)
-	assert.Len(t, service1.connectedNodes, 1)
+	assert.Len(t, s2Nodes, 1)
 
-	conn.Close()
+	rpc_client.DisconnectNode(service2, serverAddr1)
+
 	// wait server handle conn close
 	time.Sleep(time.Microsecond * 100)
-	assert.Len(t, service1.connectedNodes, 0)
+	assert.Len(t, service2.GetConnectedNodes(), 0)
 }

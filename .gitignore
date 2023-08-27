@@ -1,6 +1,7 @@
 config.yaml
 blockchain.db
 data/
+.vscode
 
 # tests
 cover.out
