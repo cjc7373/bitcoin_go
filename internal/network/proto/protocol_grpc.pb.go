@@ -27,7 +27,7 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type DiscoveryClient interface {
-	RequestNodes(ctx context.Context, in *NodeRequest, opts ...grpc.CallOption) (*Empty, error)
+	RequestNodes(ctx context.Context, in *Node, opts ...grpc.CallOption) (*Empty, error)
 	BroadcastNodes(ctx context.Context, in *NodeBroadcast, opts ...grpc.CallOption) (*Empty, error)
 }
 
@@ -39,7 +39,7 @@ func NewDiscoveryClient(cc grpc.ClientConnInterface) DiscoveryClient {
 	return &discoveryClient{cc}
 }
 
-func (c *discoveryClient) RequestNodes(ctx context.Context, in *NodeRequest, opts ...grpc.CallOption) (*Empty, error) {
+func (c *discoveryClient) RequestNodes(ctx context.Context, in *Node, opts ...grpc.CallOption) (*Empty, error) {
 	out := new(Empty)
 	err := c.cc.Invoke(ctx, Discovery_RequestNodes_FullMethodName, in, out, opts...)
 	if err != nil {
@@ -61,7 +61,7 @@ func (c *discoveryClient) BroadcastNodes(ctx context.Context, in *NodeBroadcast,
 // All implementations must embed UnimplementedDiscoveryServer
 // for forward compatibility
 type DiscoveryServer interface {
-	RequestNodes(context.Context, *NodeRequest) (*Empty, error)
+	RequestNodes(context.Context, *Node) (*Empty, error)
 	BroadcastNodes(context.Context, *NodeBroadcast) (*Empty, error)
 	mustEmbedUnimplementedDiscoveryServer()
 }
@@ -70,7 +70,7 @@ type DiscoveryServer interface {
 type UnimplementedDiscoveryServer struct {
 }
 
-func (UnimplementedDiscoveryServer) RequestNodes(context.Context, *NodeRequest) (*Empty, error) {
+func (UnimplementedDiscoveryServer) RequestNodes(context.Context, *Node) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RequestNodes not implemented")
 }
 func (UnimplementedDiscoveryServer) BroadcastNodes(context.Context, *NodeBroadcast) (*Empty, error) {
@@ -90,7 +90,7 @@ func RegisterDiscoveryServer(s grpc.ServiceRegistrar, srv DiscoveryServer) {
 }
 
 func _Discovery_RequestNodes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(NodeRequest)
+	in := new(Node)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -102,7 +102,7 @@ func _Discovery_RequestNodes_Handler(srv interface{}, ctx context.Context, dec f
 		FullMethod: Discovery_RequestNodes_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DiscoveryServer).RequestNodes(ctx, req.(*NodeRequest))
+		return srv.(DiscoveryServer).RequestNodes(ctx, req.(*Node))
 	}
 	return interceptor(ctx, in, info, handler)
 }

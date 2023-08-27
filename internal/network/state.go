@@ -24,19 +24,31 @@ type Node struct {
 	DiscoveryClient proto.DiscoveryClient
 }
 
-type service struct {
-	sync.RWMutex
-	connectedNodes map[string]*Node // key is peer's address
+func (node *Node) String() string {
+	return fmt.Sprintf("Name: %v", node.Node.Name)
 }
 
-func NewService() *service {
-	return &service{
-		connectedNodes: make(map[string]*Node),
+const broadcastInterval = time.Second * 30
+
+type Service struct {
+	shouldBroadcast chan struct{}
+
+	// below fields are protected by RW lock
+	sync.RWMutex
+	// key is peer's address
+	// contains connections initiated as a client
+	connectedNodes map[string]*Node
+}
+
+func NewService() *Service {
+	return &Service{
+		shouldBroadcast: make(chan struct{}),
+		connectedNodes:  make(map[string]*Node),
 	}
 }
 
 // lock must not hold when calling this method
-func (s *service) connectNode(address string, name string) (bool, error) {
+func (s *Service) connectNode(address string, name string) (bool, error) {
 	s.RLock()
 	_, ok := s.connectedNodes[address]
 	s.RUnlock()
@@ -61,7 +73,7 @@ func (s *service) connectNode(address string, name string) (bool, error) {
 }
 
 // lock must not hold when calling this method
-func (s *service) disconnectNode(address string) error {
+func (s *Service) disconnectNode(address string) error {
 	s.Lock()
 	defer s.Unlock()
 	node, ok := s.connectedNodes[address]
@@ -74,7 +86,7 @@ func (s *service) disconnectNode(address string) error {
 }
 
 type statsHandler struct {
-	service *service
+	service *Service
 }
 
 func (h *statsHandler) TagRPC(ctx context.Context, tagInfo *stats.RPCTagInfo) context.Context {
@@ -112,11 +124,29 @@ func (h *statsHandler) HandleConn(ctx context.Context, connStats stats.ConnStats
 	}
 }
 
-func (s *service) Serve(address string, done chan error) {
+func (s *Service) handleBroadcast() {
+	timer := time.NewTimer(broadcastInterval)
+	for {
+		select {
+		case <-s.shouldBroadcast:
+			log.Println("shouldBroadcast chan received")
+			if !timer.Stop() {
+				<-timer.C
+			}
+		case <-timer.C:
+			log.Println("broadcast timer expired")
+		}
+		s.broadcastNodes(1)
+		timer.Reset(broadcastInterval)
+	}
+}
+
+func (s *Service) Serve(address string, done chan error) {
 	lis, _ := net.Listen("tcp", address)
 	opts := []grpc.ServerOption{grpc.StatsHandler(&statsHandler{service: s})}
 	grpcServer := grpc.NewServer(opts...)
 	discovery := discoveryServer{s: s}
 	proto.RegisterDiscoveryServer(grpcServer, &discovery)
+	go s.handleBroadcast()
 	done <- grpcServer.Serve(lis)
 }

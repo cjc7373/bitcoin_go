@@ -2,24 +2,24 @@ package network
 
 import (
 	"context"
-	"errors"
+	"log"
 
 	"github.com/cjc7373/bitcoin_go/internal/network/proto"
-	"google.golang.org/grpc/peer"
 )
 
 type discoveryServer struct {
-	s *service
+	s *Service
 
 	proto.UnimplementedDiscoveryServer
 }
 
-func (d *discoveryServer) RequestNodes(ctx context.Context, nodeRequest *proto.NodeRequest) (*proto.Empty, error) {
-	p, ok := peer.FromContext(ctx)
-	if !ok {
-		return nil, errors.New("cannot get peer info")
+func (d *discoveryServer) RequestNodes(ctx context.Context, nodeRequest *proto.Node) (*proto.Empty, error) {
+	_, err := d.s.connectNode(nodeRequest.Address, nodeRequest.Name)
+	if err != nil {
+		log.Println(err)
+		return nil, err
 	}
-	d.s.connectNode(p.Addr.String(), nodeRequest.Name)
+	d.s.shouldBroadcast <- struct{}{}
 	return &proto.Empty{}, nil
 }
 

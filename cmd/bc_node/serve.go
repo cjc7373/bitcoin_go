@@ -24,7 +24,7 @@ func RunServe(cmd *cobra.Command, args []string) {
 	if genesis {
 		fmt.Println(w)
 	} else {
-		service.ConnectFirstNode(connectTo, config.NodeName)
+		service.ConnectFirstNode(connectTo, config.ListenAddr, config.NodeName)
 	}
 	log.Println(<-done)
 }
@@ -35,7 +35,7 @@ func NewCmdServe() *cobra.Command {
 		Short: "Run a node",
 		Run:   RunServe,
 	}
-	serveCmd.Flags().BoolVar(&genesis, "genesis", false, "to create the genesis block")
+	serveCmd.Flags().BoolVar(&genesis, "genesis", false, "if there's no blockchain exist,  create the genesis block")
 	serveCmd.Flags().StringVar(&connectTo, "connect-to", "", "connect to a node as the first neighbour (either this flag or --genesis should be set)")
 	serveCmd.MarkFlagsOneRequired("genesis", "connect-to")
 	serveCmd.MarkFlagsMutuallyExclusive("genesis", "connect-to")
