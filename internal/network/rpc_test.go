@@ -12,14 +12,14 @@ import (
 )
 
 func TestDiscovery(t *testing.T) {
-	serverAddr1 := ":12200"
+	serverAddr1 := "127.0.0.1:12200"
 	service1 := network.NewService()
 	done := make(chan error)
 	go func() {
 		rpc_server.Serve(service1, serverAddr1, done)
 	}()
 
-	serverAddr2 := ":12201"
+	serverAddr2 := "127.0.0.1:12201"
 	service2 := network.NewService()
 	go func() {
 		rpc_server.Serve(service2, serverAddr2, done)
@@ -39,6 +39,6 @@ func TestDiscovery(t *testing.T) {
 	rpc_client.DisconnectNode(service2, serverAddr1)
 
 	// wait server handle conn close
-	time.Sleep(time.Microsecond * 100)
+	time.Sleep(time.Microsecond * 1000)
 	assert.Len(t, service2.GetConnectedNodes(), 0)
 }

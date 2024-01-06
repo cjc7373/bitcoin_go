@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+option go_package = "github.com/cjc7373/bitcoin_go/internal/block/proto";
+
+message TXInput {
+    bytes txid = 1; // ID of tx this input refers
+    int32 vout_index = 2; // index of an output in the tx
+    bytes signature = 3;
+    bytes pub_key = 4;
+}
+
+message TXOutput {
+    // stores the number of satoshis, which is 0.00000001 BTC.
+	// this is the smallest unit of currency in Bitcoin
+	int64 value = 1;
+	// we are not implementing the whole srcipt thing here, so just pubkey
+	// pubkey hash is just pubkey hash, not an address
+	bytes pub_key_hash = 2;
+}
+
+message Transaction {
+    bytes id = 1;
+    repeated TXInput v_in = 2;
+    repeated TXOutput v_out = 3;
+}
+
+message Block {
+    int64 timestamp = 1;
+    repeated Transaction transactions = 2;
+    bytes prev_block_hash = 3;
+    bytes hash = 4;
+    int32 nonce = 5;
+}
