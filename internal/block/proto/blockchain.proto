@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+option go_package = "github.com/cjc7373/bitcoin_go/internal/block/proto";
+
+message Blockchain {
+    bytes tip_hash = 1;
+    int64 height = 2;
+}

@@ -2,10 +2,16 @@ syntax = "proto3";
 
 option go_package = "github.com/cjc7373/bitcoin_go/internal/network/proto";
 
+import "internal/block/proto/blockchain.proto";
+// import "internal/block/proto/block.proto";
+
 service Bitcoin {
-    // a node cannot get enough infomation when it's been dialed. So the dialer sends RequestNodes rpc to it.
-    rpc RequestNodes(Node) returns (Empty) {}
     rpc BroadcastNodes(NodeBroadcast) returns (Empty) {}
+    // chain metadata will be broadcasted when a new block is mined
+    rpc BroadcastChainMetadata(Blockchain) returns (Empty) {}
+    // tx will be broadcasted when a node received one from a client
+    // rpc BroadcastTransactions()
+    // rpc RequestBlock()
 }
 
 message NodeBroadcast {
