@@ -2,6 +2,8 @@
 We will establish two connections between two nodes, as gRPC acts like client-server mode.
 For example, we will maintain A->B connection in A's connectedNodes and B->A connection in B's connectedNodes.
 
+Every node will connect to all other nodes in the network.
+
 ```mermaid
 sequenceDiagram
     participant A as A (listen at :12001)

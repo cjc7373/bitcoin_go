@@ -3,6 +3,7 @@ package rpc_server
 import (
 	"context"
 	"log"
+	"log/slog"
 	"net"
 
 	"github.com/cjc7373/bitcoin_go/internal/network"
@@ -12,7 +13,8 @@ import (
 )
 
 type BitcoinServer struct {
-	s *network.Service
+	s      *network.Service
+	logger *slog.Logger
 
 	proto.UnimplementedBitcoinServer
 }
@@ -20,10 +22,15 @@ type BitcoinServer struct {
 func (d *BitcoinServer) RequestNodes(ctx context.Context, nodeRequest *proto.Node) (*proto.Empty, error) {
 	_, err := rpc_client.ConnectNode(d.s, nodeRequest.Address, nodeRequest.Name)
 	if err != nil {
-		log.Println(err)
+		d.logger.Error(err.Error())
 		return nil, err
 	}
-	d.s.ShouldBroadcast <- struct{}{}
+	// don't block on this channel
+	select {
+	case d.s.ShouldBroadcast <- struct{}{}:
+	default:
+		d.logger.Info("ShouldBroadcast not ready to receive, skipping")
+	}
 	return &proto.Empty{}, nil
 }
 
@@ -43,11 +50,11 @@ func (d *BitcoinServer) BroadcastNodes(ctx context.Context, nodeBroadcast *proto
 	return &proto.Empty{}, nil
 }
 
-func Serve(service *network.Service, address string, done chan error) {
+func Serve(service *network.Service, address string, done chan error, logger *slog.Logger) {
 	lis, _ := net.Listen("tcp", address)
 	opts := []grpc.ServerOption{}
 	grpcServer := grpc.NewServer(opts...)
-	discovery := BitcoinServer{s: service}
+	discovery := BitcoinServer{s: service, logger: logger}
 	proto.RegisterBitcoinServer(grpcServer, &discovery)
 	go rpc_client.HandleBroadcast(service)
 	log.Println("serving at ", address)

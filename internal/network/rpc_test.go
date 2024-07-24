@@ -2,6 +2,7 @@ package network_test
 
 import (
 	"fmt"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -12,17 +13,25 @@ import (
 )
 
 func TestDiscovery(t *testing.T) {
+	logger := slog.Default()
+
 	serverAddr1 := "127.0.0.1:12200"
 	service1 := network.NewService()
 	done := make(chan error)
 	go func() {
-		rpc_server.Serve(service1, serverAddr1, done)
+		rpc_server.Serve(service1, serverAddr1, done, logger.With("server", 1))
 	}()
 
 	serverAddr2 := "127.0.0.1:12201"
 	service2 := network.NewService()
 	go func() {
-		rpc_server.Serve(service2, serverAddr2, done)
+		rpc_server.Serve(service2, serverAddr2, done, logger.With("server", 2))
+	}()
+
+	serverAddr3 := "127.0.0.1:12202"
+	service3 := network.NewService()
+	go func() {
+		rpc_server.Serve(service3, serverAddr3, done, logger.With("server", 3))
 	}()
 
 	// wait server start
