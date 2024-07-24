@@ -6,17 +6,16 @@ import "internal/block/proto/blockchain.proto";
 // import "internal/block/proto/block.proto";
 
 service Bitcoin {
-    rpc BroadcastNodes(NodeBroadcast) returns (Empty) {}
+    rpc SendNodes(Nodes) returns (Empty) {}
     // chain metadata will be broadcasted when a new block is mined
-    rpc BroadcastChainMetadata(Blockchain) returns (Empty) {}
+    rpc SendChainMetadata(Blockchain) returns (Empty) {}
     // tx will be broadcasted when a node received one from a client
     // rpc BroadcastTransactions()
     // rpc RequestBlock()
 }
 
-message NodeBroadcast {
+message Nodes {
     repeated Node nodes = 1;
-    uint32 TTL = 2;
 }
 
 message Empty {}

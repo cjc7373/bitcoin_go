@@ -20,17 +20,17 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	Bitcoin_BroadcastNodes_FullMethodName         = "/Bitcoin/BroadcastNodes"
-	Bitcoin_BroadcastChainMetadata_FullMethodName = "/Bitcoin/BroadcastChainMetadata"
+	Bitcoin_SendNodes_FullMethodName         = "/Bitcoin/SendNodes"
+	Bitcoin_SendChainMetadata_FullMethodName = "/Bitcoin/SendChainMetadata"
 )
 
 // BitcoinClient is the client API for Bitcoin service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type BitcoinClient interface {
-	BroadcastNodes(ctx context.Context, in *NodeBroadcast, opts ...grpc.CallOption) (*Empty, error)
+	SendNodes(ctx context.Context, in *Nodes, opts ...grpc.CallOption) (*Empty, error)
 	// chain metadata will be broadcasted when a new block is mined
-	BroadcastChainMetadata(ctx context.Context, in *proto.Blockchain, opts ...grpc.CallOption) (*Empty, error)
+	SendChainMetadata(ctx context.Context, in *proto.Blockchain, opts ...grpc.CallOption) (*Empty, error)
 }
 
 type bitcoinClient struct {
@@ -41,18 +41,18 @@ func NewBitcoinClient(cc grpc.ClientConnInterface) BitcoinClient {
 	return &bitcoinClient{cc}
 }
 
-func (c *bitcoinClient) BroadcastNodes(ctx context.Context, in *NodeBroadcast, opts ...grpc.CallOption) (*Empty, error) {
+func (c *bitcoinClient) SendNodes(ctx context.Context, in *Nodes, opts ...grpc.CallOption) (*Empty, error) {
 	out := new(Empty)
-	err := c.cc.Invoke(ctx, Bitcoin_BroadcastNodes_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, Bitcoin_SendNodes_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *bitcoinClient) BroadcastChainMetadata(ctx context.Context, in *proto.Blockchain, opts ...grpc.CallOption) (*Empty, error) {
+func (c *bitcoinClient) SendChainMetadata(ctx context.Context, in *proto.Blockchain, opts ...grpc.CallOption) (*Empty, error) {
 	out := new(Empty)
-	err := c.cc.Invoke(ctx, Bitcoin_BroadcastChainMetadata_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, Bitcoin_SendChainMetadata_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -63,9 +63,9 @@ func (c *bitcoinClient) BroadcastChainMetadata(ctx context.Context, in *proto.Bl
 // All implementations must embed UnimplementedBitcoinServer
 // for forward compatibility
 type BitcoinServer interface {
-	BroadcastNodes(context.Context, *NodeBroadcast) (*Empty, error)
+	SendNodes(context.Context, *Nodes) (*Empty, error)
 	// chain metadata will be broadcasted when a new block is mined
-	BroadcastChainMetadata(context.Context, *proto.Blockchain) (*Empty, error)
+	SendChainMetadata(context.Context, *proto.Blockchain) (*Empty, error)
 	mustEmbedUnimplementedBitcoinServer()
 }
 
@@ -73,11 +73,11 @@ type BitcoinServer interface {
 type UnimplementedBitcoinServer struct {
 }
 
-func (UnimplementedBitcoinServer) BroadcastNodes(context.Context, *NodeBroadcast) (*Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method BroadcastNodes not implemented")
+func (UnimplementedBitcoinServer) SendNodes(context.Context, *Nodes) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SendNodes not implemented")
 }
-func (UnimplementedBitcoinServer) BroadcastChainMetadata(context.Context, *proto.Blockchain) (*Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method BroadcastChainMetadata not implemented")
+func (UnimplementedBitcoinServer) SendChainMetadata(context.Context, *proto.Blockchain) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SendChainMetadata not implemented")
 }
 func (UnimplementedBitcoinServer) mustEmbedUnimplementedBitcoinServer() {}
 
@@ -92,38 +92,38 @@ func RegisterBitcoinServer(s grpc.ServiceRegistrar, srv BitcoinServer) {
 	s.RegisterService(&Bitcoin_ServiceDesc, srv)
 }
 
-func _Bitcoin_BroadcastNodes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(NodeBroadcast)
+func _Bitcoin_SendNodes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Nodes)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(BitcoinServer).BroadcastNodes(ctx, in)
+		return srv.(BitcoinServer).SendNodes(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Bitcoin_BroadcastNodes_FullMethodName,
+		FullMethod: Bitcoin_SendNodes_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(BitcoinServer).BroadcastNodes(ctx, req.(*NodeBroadcast))
+		return srv.(BitcoinServer).SendNodes(ctx, req.(*Nodes))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Bitcoin_BroadcastChainMetadata_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Bitcoin_SendChainMetadata_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(proto.Blockchain)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(BitcoinServer).BroadcastChainMetadata(ctx, in)
+		return srv.(BitcoinServer).SendChainMetadata(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Bitcoin_BroadcastChainMetadata_FullMethodName,
+		FullMethod: Bitcoin_SendChainMetadata_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(BitcoinServer).BroadcastChainMetadata(ctx, req.(*proto.Blockchain))
+		return srv.(BitcoinServer).SendChainMetadata(ctx, req.(*proto.Blockchain))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -136,12 +136,12 @@ var Bitcoin_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*BitcoinServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "BroadcastNodes",
-			Handler:    _Bitcoin_BroadcastNodes_Handler,
+			MethodName: "SendNodes",
+			Handler:    _Bitcoin_SendNodes_Handler,
 		},
 		{
-			MethodName: "BroadcastChainMetadata",
-			Handler:    _Bitcoin_BroadcastChainMetadata_Handler,
+			MethodName: "SendChainMetadata",
+			Handler:    _Bitcoin_SendChainMetadata_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

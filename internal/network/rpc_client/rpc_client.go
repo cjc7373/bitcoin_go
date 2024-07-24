@@ -2,7 +2,6 @@ package rpc_client
 
 import (
 	"context"
-	"errors"
 	"log"
 	"log/slog"
 	"time"
@@ -25,7 +24,10 @@ func NewRPCClient(service *network.Service, logger *slog.Logger) RPCClient {
 	}
 }
 
-func (c *RPCClient) ConnectNode(address string, name string) (bool, error) {
+func (c *RPCClient) ConnectNode(address string, name string, localServerAddr, localName string) (bool, error) {
+	if name == localName {
+		return false, nil
+	}
 	if _, ok := c.service.GetConnectedNode(address); ok {
 		// already connected
 		return false, nil
@@ -46,43 +48,30 @@ func (c *RPCClient) ConnectNode(address string, name string) (bool, error) {
 		BitcoinClient: proto.NewBitcoinClient(conn),
 	}
 	c.service.SetConnectedNode(address, node)
+	node.BitcoinClient.SendNodes(context.TODO(), &proto.Nodes{Nodes: []*proto.Node{
+		{
+			Name:    localName,
+			Address: localServerAddr,
+		},
+	}})
 	return true, nil
 }
 
-func (c *RPCClient) ConnectFirstNode(remoteServerAddr, localServerAddr, localName string) error {
-	_, err := c.ConnectNode(remoteServerAddr, "")
-	if err != nil {
-		return err
-	}
-
-	node, ok := c.service.GetConnectedNode(remoteServerAddr)
-	if !ok {
-		return errors.New("cannot get connected node")
-	}
-	_, err = node.BitcoinClient.RequestNodes(context.Background(), &proto.Node{
-		Name:    localName,
-		Address: localServerAddr,
-	})
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
+// this function may block
 func (c *RPCClient) BroadcastNodes(ttl uint32) {
-	log.Println("broadcasting nodes..")
 	connectedNodes := c.service.GetConnectedNodes()
-	log.Println("connected nodes: ", connectedNodes)
+	c.logger.Info("broadcasting nodes..", "connectedNodes", connectedNodes)
 	protoNodes := make([]*proto.Node, 0, len(connectedNodes))
 	clients := make([]proto.BitcoinClient, 0, len(connectedNodes))
 	for _, v := range connectedNodes {
 		protoNodes = append(protoNodes, &proto.Node{Address: v.Address, Name: v.Name})
 		clients = append(clients, v.BitcoinClient)
 	}
+
+	// TODO: use goroutine to parallel this
 	for _, client := range clients {
-		_, err := client.BroadcastNodes(context.Background(), &proto.NodeBroadcast{
+		_, err := client.SendNodes(context.Background(), &proto.Nodes{
 			Nodes: protoNodes,
-			TTL:   ttl,
 		})
 		if err != nil {
 			log.Println(err)
