@@ -13,14 +13,23 @@ import (
 )
 
 type BitcoinServer struct {
-	s      *network.Service
-	logger *slog.Logger
+	RPCClient rpc_client.RPCClient
+	s         *network.Service
+	logger    *slog.Logger
 
 	proto.UnimplementedBitcoinServer
 }
 
+func NewRPCServer(service *network.Service, logger *slog.Logger) BitcoinServer {
+	return BitcoinServer{
+		s:         service,
+		logger:    logger,
+		RPCClient: rpc_client.NewRPCClient(service, logger),
+	}
+}
+
 func (d *BitcoinServer) RequestNodes(ctx context.Context, nodeRequest *proto.Node) (*proto.Empty, error) {
-	_, err := rpc_client.ConnectNode(d.s, nodeRequest.Address, nodeRequest.Name)
+	_, err := d.RPCClient.ConnectNode(nodeRequest.Address, nodeRequest.Name)
 	if err != nil {
 		d.logger.Error(err.Error())
 		return nil, err
@@ -37,26 +46,25 @@ func (d *BitcoinServer) RequestNodes(ctx context.Context, nodeRequest *proto.Nod
 func (d *BitcoinServer) BroadcastNodes(ctx context.Context, nodeBroadcast *proto.NodeBroadcast) (*proto.Empty, error) {
 	for _, node := range nodeBroadcast.Nodes {
 		// TODO: exclude non-modified nodes and sender node
-		_, err := rpc_client.ConnectNode(d.s, node.Address, node.Name)
+		_, err := d.RPCClient.ConnectNode(node.Address, node.Name)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	if nodeBroadcast.TTL > 0 {
-		rpc_client.BroadcastNodes(d.s, nodeBroadcast.TTL-1)
+		d.RPCClient.BroadcastNodes(nodeBroadcast.TTL - 1)
 	}
 
 	return &proto.Empty{}, nil
 }
 
-func Serve(service *network.Service, address string, done chan error, logger *slog.Logger) {
+func Serve(rpcServer BitcoinServer, address string, done chan error) {
 	lis, _ := net.Listen("tcp", address)
 	opts := []grpc.ServerOption{}
 	grpcServer := grpc.NewServer(opts...)
-	discovery := BitcoinServer{s: service, logger: logger}
-	proto.RegisterBitcoinServer(grpcServer, &discovery)
-	go rpc_client.HandleBroadcast(service)
+	proto.RegisterBitcoinServer(grpcServer, &rpcServer)
+	go rpcServer.RPCClient.HandleBroadcast()
 	log.Println("serving at ", address)
 	done <- grpcServer.Serve(lis)
 }

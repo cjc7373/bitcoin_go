@@ -3,9 +3,9 @@ package main
 import (
 	"fmt"
 	"log"
+	"log/slog"
 
 	"github.com/cjc7373/bitcoin_go/internal/network"
-	"github.com/cjc7373/bitcoin_go/internal/network/rpc_client"
 	"github.com/cjc7373/bitcoin_go/internal/network/rpc_server"
 	"github.com/cjc7373/bitcoin_go/internal/utils"
 	"github.com/cjc7373/bitcoin_go/internal/wallet"
@@ -18,15 +18,17 @@ var connectTo string
 func RunServe(cmd *cobra.Command, args []string) {
 	config := utils.GetConfigFromContext(cmd.Context())
 	w := wallet.ReadOrCreateWalletFromConfig(config)
+	logger := slog.Default()
 
 	service := network.NewService()
+	rpcServer := rpc_server.NewRPCServer(service, logger)
 	done := make(chan error)
-	go rpc_server.Serve(service, config.ListenAddr, done)
+	go rpc_server.Serve(rpcServer, config.ListenAddr, done)
 
 	if genesis {
 		fmt.Println(w)
 	} else {
-		rpc_client.ConnectFirstNode(service, connectTo, config.ListenAddr, config.NodeName)
+		rpcServer.RPCClient.ConnectFirstNode(connectTo, config.ListenAddr, config.NodeName)
 	}
 	log.Println(<-done)
 }

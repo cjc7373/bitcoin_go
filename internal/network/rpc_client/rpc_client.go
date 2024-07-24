@@ -4,62 +4,38 @@ import (
 	"context"
 	"errors"
 	"log"
+	"log/slog"
 	"time"
 
 	"github.com/cjc7373/bitcoin_go/internal/network"
 	"github.com/cjc7373/bitcoin_go/internal/network/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/peer"
-	"google.golang.org/grpc/stats"
 )
 
-type statsHandler struct {
+type RPCClient struct {
 	service *network.Service
+	logger  *slog.Logger
 }
 
-func (h *statsHandler) TagRPC(ctx context.Context, tagInfo *stats.RPCTagInfo) context.Context {
-	return ctx
-}
-
-func (h *statsHandler) HandleRPC(context.Context, stats.RPCStats) {}
-
-func (h *statsHandler) TagConn(ctx context.Context, tagInfo *stats.ConnTagInfo) context.Context {
-	return ctx
-}
-
-func (h *statsHandler) HandleConn(ctx context.Context, connStats stats.ConnStats) {
-	switch connStats.(type) {
-	case *stats.ConnBegin:
-		s := "unknown address"
-		p, ok := peer.FromContext(ctx)
-		if ok {
-			s = p.Addr.String()
-		}
-		log.Println("connection established to ", s)
-	case *stats.ConnEnd:
-		p, ok := peer.FromContext(ctx)
-		if !ok {
-			log.Println(errors.New("unknown connection disconnected"))
-		} else {
-			addr := p.Addr.String()
-			log.Printf("Connection with %v disconnected", addr)
-			DisconnectNode(h.service, addr)
-		}
+func NewRPCClient(service *network.Service, logger *slog.Logger) RPCClient {
+	return RPCClient{
+		service: service,
+		logger:  logger,
 	}
 }
 
-func ConnectNode(service *network.Service, address string, name string) (bool, error) {
-	if _, ok := service.GetConnectedNode(address); ok {
+func (c *RPCClient) ConnectNode(address string, name string) (bool, error) {
+	if _, ok := c.service.GetConnectedNode(address); ok {
 		// already connected
 		return false, nil
 	}
 	opts := []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithNoProxy(),
-		grpc.WithStatsHandler(&statsHandler{service: service}),
+		grpc.WithStatsHandler(&statsHandler{service: c.service}),
 	}
-	conn, err := grpc.Dial(address, opts...)
+	conn, err := grpc.NewClient(address, opts...)
 	if err != nil {
 		return false, err
 	}
@@ -69,27 +45,17 @@ func ConnectNode(service *network.Service, address string, name string) (bool, e
 		LastHeartbeat: time.Now(),
 		BitcoinClient: proto.NewBitcoinClient(conn),
 	}
-	service.SetConnectedNode(address, node)
+	c.service.SetConnectedNode(address, node)
 	return true, nil
 }
 
-func DisconnectNode(service *network.Service, address string) error {
-	node, ok := service.GetConnectedNode(address)
-	if !ok {
-		return errors.New("node does not exist")
-	}
-	node.Conn.Close()
-	service.DeleteConnectedNode(address)
-	return nil
-}
-
-func ConnectFirstNode(service *network.Service, remoteServerAddr, localServerAddr, localName string) error {
-	_, err := ConnectNode(service, remoteServerAddr, "")
+func (c *RPCClient) ConnectFirstNode(remoteServerAddr, localServerAddr, localName string) error {
+	_, err := c.ConnectNode(remoteServerAddr, "")
 	if err != nil {
 		return err
 	}
 
-	node, ok := service.GetConnectedNode(remoteServerAddr)
+	node, ok := c.service.GetConnectedNode(remoteServerAddr)
 	if !ok {
 		return errors.New("cannot get connected node")
 	}
@@ -103,9 +69,9 @@ func ConnectFirstNode(service *network.Service, remoteServerAddr, localServerAdd
 	return nil
 }
 
-func BroadcastNodes(service *network.Service, ttl uint32) {
+func (c *RPCClient) BroadcastNodes(ttl uint32) {
 	log.Println("broadcasting nodes..")
-	connectedNodes := service.GetConnectedNodes()
+	connectedNodes := c.service.GetConnectedNodes()
 	log.Println("connected nodes: ", connectedNodes)
 	protoNodes := make([]*proto.Node, 0, len(connectedNodes))
 	clients := make([]proto.BitcoinClient, 0, len(connectedNodes))
@@ -124,11 +90,11 @@ func BroadcastNodes(service *network.Service, ttl uint32) {
 	}
 }
 
-func HandleBroadcast(service *network.Service) {
+func (c *RPCClient) HandleBroadcast() {
 	timer := time.NewTimer(network.BroadcastInterval)
 	for {
 		select {
-		case <-service.ShouldBroadcast:
+		case <-c.service.ShouldBroadcast:
 			log.Println("shouldBroadcast chan received")
 			if !timer.Stop() {
 				<-timer.C
@@ -136,7 +102,7 @@ func HandleBroadcast(service *network.Service) {
 		case <-timer.C:
 			log.Println("broadcast timer expired")
 		}
-		BroadcastNodes(service, 1)
+		c.BroadcastNodes(1)
 		timer.Reset(network.BroadcastInterval)
 	}
 }

@@ -18,26 +18,29 @@ func TestDiscovery(t *testing.T) {
 	serverAddr1 := "127.0.0.1:12200"
 	service1 := network.NewService()
 	done := make(chan error)
+	rpcServer1 := rpc_server.NewRPCServer(service1, logger.With("server", 1))
 	go func() {
-		rpc_server.Serve(service1, serverAddr1, done, logger.With("server", 1))
+		rpc_server.Serve(rpcServer1, serverAddr1, done)
 	}()
 
 	serverAddr2 := "127.0.0.1:12201"
 	service2 := network.NewService()
+	rpcServer2 := rpc_server.NewRPCServer(service2, logger.With("server", 2))
 	go func() {
-		rpc_server.Serve(service2, serverAddr2, done, logger.With("server", 2))
+		rpc_server.Serve(rpcServer2, serverAddr2, done)
 	}()
 
 	serverAddr3 := "127.0.0.1:12202"
 	service3 := network.NewService()
+	rpcServer3 := rpc_server.NewRPCServer(service3, logger.With("server", 3))
 	go func() {
-		rpc_server.Serve(service3, serverAddr3, done, logger.With("server", 3))
+		rpc_server.Serve(rpcServer3, serverAddr3, done)
 	}()
 
 	// wait server start
 	time.Sleep(time.Microsecond * 100)
 
-	err := rpc_client.ConnectFirstNode(service2, serverAddr1, serverAddr2, "service2")
+	err := rpcServer2.RPCClient.ConnectFirstNode(serverAddr1, serverAddr2, "service2")
 	assert.Nil(t, err)
 
 	s2Nodes := service2.GetConnectedNodes()

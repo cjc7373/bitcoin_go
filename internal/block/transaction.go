@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/btcsuite/btcutil/base58"
+
 	"github.com/cjc7373/bitcoin_go/internal/utils"
 	"github.com/cjc7373/bitcoin_go/internal/wallet"
 )
@@ -120,7 +121,9 @@ func NewTransaction(w *wallet.Wallet, to string, amount int64, uxtoSet *UTXOSet)
 		outputs = append(outputs, TXOutput{foundAmount - amount, utils.HashPubKey(w.PublicKey)})
 	}
 	tx := Transaction{nil, inputs, outputs}
-	tx.Sign(w.PrivateKey)
+	if err := tx.Sign(w.PrivateKey); err != nil {
+		return nil, err
+	}
 	tx.ID = tx.hash()
 	return &tx, nil
 }
@@ -170,12 +173,12 @@ func (tx *Transaction) Sign(privKey ecdsa.PrivateKey) error {
 		tx.Vin[index].PubKey = pubkey
 		data, err := json.Marshal(&tx.Vin[index])
 		if err != nil {
-			panic(err)
+			return err
 		}
 		hash := sha256.Sum256(data)
 		sig, err := ecdsa.SignASN1(rand.Reader, &privKey, hash[:])
 		if err != nil {
-			panic(err)
+			return err
 		}
 		tx.Vin[index].Signature = sig
 	}
