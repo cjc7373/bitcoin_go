@@ -48,12 +48,14 @@ func (c *RPCClient) ConnectNode(address string, name string, localServerAddr, lo
 		BitcoinClient: proto.NewBitcoinClient(conn),
 	}
 	c.service.SetConnectedNode(address, node)
+	c.logger.Info("node connected", "peer", node)
 	node.BitcoinClient.SendNodes(context.TODO(), &proto.Nodes{Nodes: []*proto.Node{
 		{
 			Name:    localName,
 			Address: localServerAddr,
 		},
 	}})
+	c.logger.Info("send nodes rpc sent", "peer", node)
 	return true, nil
 }
 

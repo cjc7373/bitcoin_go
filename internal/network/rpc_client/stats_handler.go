@@ -43,7 +43,7 @@ func (h *statsHandler) HandleConn(ctx context.Context, connStats stats.ConnStats
 			addr := p.Addr.String()
 			log.Printf("Connection with %v disconnected", addr)
 			if err := DisconnectNode(h.service, addr); err != nil {
-
+				h.logger.Error("disconnect error", "error", err)
 			}
 		}
 	}

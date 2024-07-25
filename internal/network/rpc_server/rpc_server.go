@@ -2,7 +2,7 @@ package rpc_server
 
 import (
 	"context"
-	"log"
+	"errors"
 	"log/slog"
 	"net"
 
@@ -19,6 +19,10 @@ type BitcoinServer struct {
 	logger    *slog.Logger
 	config    *utils.Config
 
+	// whether server has exited
+	done       chan error
+	grpcServer *grpc.Server
+
 	proto.UnimplementedBitcoinServer
 }
 
@@ -28,6 +32,8 @@ func NewRPCServer(service *network.Service, logger *slog.Logger, config *utils.C
 		logger:    logger,
 		RPCClient: rpc_client.NewRPCClient(service, logger),
 		config:    config,
+
+		done: make(chan error),
 	}
 }
 
@@ -55,12 +61,31 @@ func (d *BitcoinServer) SendNodes(ctx context.Context, nodes *proto.Nodes) (*pro
 	return &proto.Empty{}, nil
 }
 
-func Serve(rpcServer BitcoinServer, address string, done chan error) {
-	lis, _ := net.Listen("tcp", address)
+func (d *BitcoinServer) Serve() error {
+	lis, err := net.Listen("tcp", d.config.ListenAddr)
+	if err != nil {
+		return errors.Join(errors.New("listen failed"), err)
+	}
 	opts := []grpc.ServerOption{}
 	grpcServer := grpc.NewServer(opts...)
-	proto.RegisterBitcoinServer(grpcServer, &rpcServer)
-	go rpcServer.RPCClient.HandleBroadcast()
-	log.Println("serving at ", address)
-	done <- grpcServer.Serve(lis)
+	d.grpcServer = grpcServer
+	proto.RegisterBitcoinServer(grpcServer, d)
+	go d.RPCClient.HandleBroadcast()
+	go func() {
+		d.logger.Info("serving", "addr", d.config.ListenAddr)
+		d.done <- grpcServer.Serve(lis)
+	}()
+	return nil
+}
+
+func (d *BitcoinServer) Stop() {
+	d.grpcServer.GracefulStop()
+}
+
+func (d *BitcoinServer) GetConnectedNodes() map[string]*network.Node {
+	return d.s.GetConnectedNodes()
+}
+
+func (d *BitcoinServer) DisconnectNode(address string) error {
+	return rpc_client.DisconnectNode(d.s, address)
 }

@@ -3,66 +3,74 @@ package network_test
 import (
 	"fmt"
 	"log/slog"
-	"testing"
-	"time"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 
 	"github.com/cjc7373/bitcoin_go/internal/network"
-	"github.com/cjc7373/bitcoin_go/internal/network/rpc_client"
 	"github.com/cjc7373/bitcoin_go/internal/network/rpc_server"
 	"github.com/cjc7373/bitcoin_go/internal/utils"
-	"github.com/stretchr/testify/assert"
 )
 
-// TODO: refactor with ginkgo
-func TestDiscovery(t *testing.T) {
-	logger := slog.Default()
+var _ = Describe("RPC test", func() {
+	var rpcServers []*rpc_server.BitcoinServer
+	var configs []utils.Config
+	var nodeNum = 5
+	BeforeEach(func() {
+		rpcServers = make([]*rpc_server.BitcoinServer, 0)
+		configs = make([]utils.Config, 0)
+		logger := slog.Default()
+		for i := range nodeNum {
+			config := utils.Config{
+				ListenAddr: fmt.Sprintf("127.0.0.1:1220%v", i),
+				NodeName:   fmt.Sprintf("node%v", i),
+			}
+			configs = append(configs, config)
+			service := network.NewService()
+			rpcServer := rpc_server.NewRPCServer(service, logger.With("node", config.NodeName), &config)
+			rpcServer.Serve()
+			rpcServers = append(rpcServers, &rpcServer)
+		}
+	})
 
-	config1 := utils.Config{
-		ListenAddr: "127.0.0.1:12201",
-		NodeName:   "node1",
-	}
-	service1 := network.NewService()
-	done := make(chan error)
-	rpcServer1 := rpc_server.NewRPCServer(service1, logger.With("node", config1.NodeName), &config1)
-	go func() {
-		rpc_server.Serve(rpcServer1, config1.ListenAddr, done)
-	}()
+	AfterEach(func() {
+		for _, rpcServer := range rpcServers {
+			rpcServer.Stop()
+		}
+		rpcServers = nil
+		configs = nil
+	})
 
-	config2 := utils.Config{
-		ListenAddr: "127.0.0.1:12202",
-		NodeName:   "node2",
-	}
-	service2 := network.NewService()
-	rpcServer2 := rpc_server.NewRPCServer(service2, logger.With("node", config2.NodeName), &config2)
-	go func() {
-		rpc_server.Serve(rpcServer2, config2.ListenAddr, done)
-	}()
+	It("connects a node", func() {
+		connected, err := rpcServers[0].RPCClient.ConnectNode(
+			configs[1].ListenAddr, configs[1].NodeName, configs[0].ListenAddr, configs[0].NodeName,
+		)
+		Expect(connected).To(BeTrue())
+		Expect(err).NotTo(HaveOccurred())
 
-	config3 := utils.Config{
-		ListenAddr: "127.0.0.1:12203",
-		NodeName:   "node3",
-	}
-	service3 := network.NewService()
-	rpcServer3 := rpc_server.NewRPCServer(service3, logger.With("node", config3.NodeName), &config3)
-	go func() {
-		rpc_server.Serve(rpcServer3, config3.ListenAddr, done)
-	}()
+		Eventually(func() int {
+			return len(rpcServers[0].GetConnectedNodes())
+		}).Should(Equal(1))
 
-	// wait server start
-	time.Sleep(time.Microsecond * 100)
+		Expect(rpcServers[0].DisconnectNode(configs[1].ListenAddr)).Should(Succeed())
+		Eventually(func() int {
+			return len(rpcServers[0].GetConnectedNodes())
+		}).Should(Equal(0))
+	})
 
-	connected, err := rpcServer2.RPCClient.ConnectNode(config1.ListenAddr, config1.NodeName, config2.ListenAddr, config2.NodeName)
-	assert.Nil(t, err)
-	assert.True(t, connected)
+	It("connects all nodes", func() {
+		for i := 1; i < nodeNum; i++ {
+			connected, err := rpcServers[0].RPCClient.ConnectNode(
+				configs[i].ListenAddr, configs[i].NodeName, configs[0].ListenAddr, configs[0].NodeName,
+			)
+			Expect(connected).To(BeTrue())
+			Expect(err).NotTo(HaveOccurred())
+		}
 
-	s2Nodes := service2.GetConnectedNodes()
-	fmt.Println(s2Nodes)
-	assert.Nil(t, err)
-	assert.Len(t, s2Nodes, 1)
-
-	rpc_client.DisconnectNode(service2, config1.ListenAddr)
-
-	// wait server handle conn close
-	time.Sleep(time.Microsecond * 1000)
-	assert.Len(t, service2.GetConnectedNodes(), 0)
-}
+		for i := range nodeNum {
+			Eventually(func() int {
+				return len(rpcServers[i].GetConnectedNodes())
+			}).Should(Equal(4))
+		}
+	})
+})
