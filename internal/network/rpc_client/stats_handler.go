@@ -3,7 +3,6 @@ package rpc_client
 import (
 	"context"
 	"errors"
-	"log"
 	"log/slog"
 
 	"github.com/cjc7373/bitcoin_go/internal/network"
@@ -34,14 +33,14 @@ func (h *statsHandler) HandleConn(ctx context.Context, connStats stats.ConnStats
 		if ok {
 			s = p.Addr.String()
 		}
-		log.Println("connection established to ", s)
+		h.logger.Info("connection established", "addr", s)
 	case *stats.ConnEnd:
 		p, ok := peer.FromContext(ctx)
 		if !ok {
-			log.Println(errors.New("unknown connection disconnected"))
+			h.logger.Error("unknown connection disconnected")
 		} else {
 			addr := p.Addr.String()
-			log.Printf("Connection with %v disconnected", addr)
+			h.logger.Info("connection disconnected", "addr", addr)
 			if err := DisconnectNode(h.service, addr); err != nil {
 				h.logger.Error("disconnect error", "error", err)
 			}

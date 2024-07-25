@@ -60,8 +60,8 @@ var _ = Describe("RPC test", func() {
 
 	It("connects all nodes", func() {
 		for i := 1; i < nodeNum; i++ {
-			connected, err := rpcServers[0].RPCClient.ConnectNode(
-				configs[i].ListenAddr, configs[i].NodeName, configs[0].ListenAddr, configs[0].NodeName,
+			connected, err := rpcServers[i].RPCClient.ConnectNode(
+				configs[0].ListenAddr, configs[0].NodeName, configs[i].ListenAddr, configs[i].NodeName,
 			)
 			Expect(connected).To(BeTrue())
 			Expect(err).NotTo(HaveOccurred())

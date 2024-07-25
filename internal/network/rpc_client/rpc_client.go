@@ -35,7 +35,7 @@ func (c *RPCClient) ConnectNode(address string, name string, localServerAddr, lo
 	opts := []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithNoProxy(),
-		grpc.WithStatsHandler(&statsHandler{service: c.service}),
+		grpc.WithStatsHandler(&statsHandler{service: c.service, logger: c.logger}),
 	}
 	conn, err := grpc.NewClient(address, opts...)
 	if err != nil {
@@ -86,12 +86,12 @@ func (c *RPCClient) HandleBroadcast() {
 	for {
 		select {
 		case <-c.service.ShouldBroadcast:
-			log.Println("shouldBroadcast chan received")
+			c.logger.Info("shouldBroadcast chan received")
 			if !timer.Stop() {
 				<-timer.C
 			}
 		case <-timer.C:
-			log.Println("broadcast timer expired")
+			c.logger.Info("broadcast timer expired")
 		}
 		c.BroadcastNodes(1)
 		timer.Reset(network.BroadcastInterval)
