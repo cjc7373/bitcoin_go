@@ -6,8 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cjc7373/bitcoin_go/internal/network/proto"
 	"google.golang.org/grpc"
+
+	"github.com/cjc7373/bitcoin_go/internal/network/proto"
 )
 
 type Node struct {

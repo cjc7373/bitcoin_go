@@ -24,6 +24,7 @@ message Transaction {
     repeated TXOutput v_out = 3;
 }
 
+// in bolt db, key will be block hash
 message Block {
     int64 timestamp = 1;
     repeated Transaction transactions = 2;

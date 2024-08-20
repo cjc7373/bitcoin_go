@@ -7,7 +7,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/cjc7373/bitcoin_go/internal/network"
 	"github.com/cjc7373/bitcoin_go/internal/network/rpc_server"
 	"github.com/cjc7373/bitcoin_go/internal/utils"
 )
@@ -26,8 +25,7 @@ var _ = Describe("RPC test", func() {
 				NodeName:   fmt.Sprintf("node%v", i),
 			}
 			configs = append(configs, config)
-			service := network.NewService()
-			rpcServer := rpc_server.NewRPCServer(service, logger.With("node", config.NodeName), &config)
+			rpcServer := rpc_server.NewRPCServer(logger.With("node", config.NodeName), &config)
 			rpcServer.Serve()
 			rpcServers = append(rpcServers, &rpcServer)
 		}

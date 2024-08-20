@@ -7,7 +7,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/cjc7373/bitcoin_go/internal/network"
 	"github.com/cjc7373/bitcoin_go/internal/network/rpc_server"
 	"github.com/cjc7373/bitcoin_go/internal/utils"
 	"github.com/cjc7373/bitcoin_go/internal/wallet"
@@ -22,8 +21,7 @@ func RunServe(cmd *cobra.Command, args []string) {
 	w := wallet.ReadOrCreateWalletFromConfig(config)
 	logger := slog.Default()
 
-	service := network.NewService()
-	rpcServer := rpc_server.NewRPCServer(service, logger, config)
+	rpcServer := rpc_server.NewRPCServer(logger, config)
 	done := make(chan error)
 	go rpcServer.Serve()
 

@@ -1,11 +1,14 @@
 package rpc_server
 
 import (
-	"context"
 	"errors"
 	"log/slog"
 	"net"
 
+	bolt "go.etcd.io/bbolt"
+
+	block_proto "github.com/cjc7373/bitcoin_go/internal/block/proto"
+	"github.com/cjc7373/bitcoin_go/internal/db"
 	"github.com/cjc7373/bitcoin_go/internal/network"
 	"github.com/cjc7373/bitcoin_go/internal/network/proto"
 	"github.com/cjc7373/bitcoin_go/internal/network/rpc_client"
@@ -23,10 +26,17 @@ type BitcoinServer struct {
 	done       chan error
 	grpcServer *grpc.Server
 
+	DB *bolt.DB
+
+	// persistant data
+	blockchain block_proto.Blockchain
+
 	proto.UnimplementedBitcoinServer
 }
 
-func NewRPCServer(service *network.Service, logger *slog.Logger, config *utils.Config) BitcoinServer {
+func NewRPCServer(logger *slog.Logger, config *utils.Config) BitcoinServer {
+	service := network.NewService()
+
 	return BitcoinServer{
 		s:         service,
 		logger:    logger,
@@ -34,31 +44,9 @@ func NewRPCServer(service *network.Service, logger *slog.Logger, config *utils.C
 		config:    config,
 
 		done: make(chan error),
-	}
-}
 
-func (d *BitcoinServer) SendNodes(ctx context.Context, nodes *proto.Nodes) (*proto.Empty, error) {
-	connectedNodesUpdated := false
-	for _, node := range nodes.Nodes {
-		connected, err := d.RPCClient.ConnectNode(node.Address, node.Name, d.config.ListenAddr, d.config.NodeName)
-		if err != nil {
-			return nil, err
-		}
-		if connected {
-			connectedNodesUpdated = true
-		}
+		DB: db.GetDB(config),
 	}
-
-	if connectedNodesUpdated {
-		// don't block on this channel
-		select {
-		case d.s.ShouldBroadcast <- struct{}{}:
-		default:
-			d.logger.Info("ShouldBroadcast not ready to receive, skipping")
-		}
-	}
-
-	return &proto.Empty{}, nil
 }
 
 func (d *BitcoinServer) Serve() error {
