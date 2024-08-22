@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"time"
 
+	block_proto "github.com/cjc7373/bitcoin_go/internal/block/proto"
 	"github.com/cjc7373/bitcoin_go/internal/utils"
 )
 
@@ -24,11 +25,11 @@ const maxNonce = math.MaxInt64
 var PowSleepTime time.Duration = 0
 
 type ProofOfWork struct {
-	block  *Block
+	block  *block_proto.Block
 	target *big.Int
 }
 
-func NewProofOfWork(b *Block) *ProofOfWork {
+func NewProofOfWork(b *block_proto.Block) *ProofOfWork {
 	target := big.NewInt(1)
 	// hex of target will be 0x00000100000....
 	target.Lsh(target, uint(256-targetBits))
@@ -38,7 +39,7 @@ func NewProofOfWork(b *Block) *ProofOfWork {
 	return pow
 }
 
-func (pow *ProofOfWork) prepareData(nonce int) []byte {
+func (pow *ProofOfWork) prepareData(nonce int64) []byte {
 	txData, err := json.Marshal(pow.block.Transactions)
 	if err != nil {
 		panic(err)
@@ -49,7 +50,7 @@ func (pow *ProofOfWork) prepareData(nonce int) []byte {
 			txData,
 			utils.IntToHex(pow.block.Timestamp),
 			utils.IntToHex(int64(targetBits)),
-			utils.IntToHex(int64(nonce)),
+			utils.IntToHex(nonce),
 		},
 		[]byte{},
 	)
@@ -57,16 +58,16 @@ func (pow *ProofOfWork) prepareData(nonce int) []byte {
 	return data
 }
 
-func (pow *ProofOfWork) setNonce(data []byte, nonce int) []byte {
+func (pow *ProofOfWork) setNonce(data []byte, nonce int64) []byte {
 	time.Sleep(PowSleepTime)
 	trimmedData := data[:len(data)-8]
-	return append(trimmedData, utils.IntToHex(int64(nonce))...)
+	return append(trimmedData, utils.IntToHex(nonce)...)
 }
 
-func (pow *ProofOfWork) Run() (int, []byte) {
+func (pow *ProofOfWork) Run() (int64, []byte) {
 	var hashInt big.Int
 	var hash [32]byte
-	nonce := 0
+	var nonce int64
 
 	fmt.Printf("Mining the block containing the following txs:\n")
 	for _, tx := range pow.block.Transactions {

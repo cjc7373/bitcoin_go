@@ -12,6 +12,7 @@ import (
 
 	"github.com/btcsuite/btcutil/base58"
 
+	block_proto "github.com/cjc7373/bitcoin_go/internal/block/proto"
 	"github.com/cjc7373/bitcoin_go/internal/utils"
 	"github.com/cjc7373/bitcoin_go/internal/wallet"
 )
@@ -49,11 +50,11 @@ type TXOutput struct {
 
 // NewTXOutput create a new TXOutput
 // trim the address to only contain pubkey hash
-func NewTXOutput(value int64, address string) *TXOutput {
+func NewTXOutput(value int64, address string) *block_proto.TXOutput {
 	addressBytes := base58.Decode(address)
 	pubkeyHash := addressBytes[1 : len(addressBytes)-4]
 
-	txo := &TXOutput{Value: value, PubKeyHash: pubkeyHash}
+	txo := &block_proto.TXOutput{Value: value, PubKeyHash: pubkeyHash}
 	return txo
 }
 
@@ -64,11 +65,12 @@ type Transaction struct {
 }
 
 // hash returns the hash of the Transaction
-func (tx *Transaction) hash() []byte {
+func hash(tx *block_proto.Transaction) []byte {
 	var hash [32]byte
 
+	// TODO: why txCopy is needed?
 	txCopy := *tx
-	txCopy.ID = []byte{}
+	txCopy.Id = []byte{}
 
 	data, err := json.Marshal(&txCopy)
 	if err != nil {
@@ -79,11 +81,12 @@ func (tx *Transaction) hash() []byte {
 	return hash[:]
 }
 
+// reward for the miner
 const subsidy = 10000
 
 // create a new tx, which has an output to reward the miner
 // this output
-func NewCoinbaseTransaction(to string, data []byte) *Transaction {
+func NewCoinbaseTransaction(to string, data []byte) *block_proto.Transaction {
 	if data != nil {
 		// create an empty input to make the hash change every time
 		data = make([]byte, 10)
@@ -93,44 +96,60 @@ func NewCoinbaseTransaction(to string, data []byte) *Transaction {
 		}
 	}
 
-	input := TXInput{nil, -1, nil, data}
+	input := block_proto.TXInput{
+		Txid:      nil,
+		VoutIndex: -1,
+		Signature: nil,
+		PubKey:    data,
+	}
 	output := NewTXOutput(subsidy, to)
-	tx := Transaction{nil, []TXInput{input}, []TXOutput{*output}}
-	tx.ID = tx.hash()
+	tx := block_proto.Transaction{
+		Id:   nil,
+		VIn:  []*block_proto.TXInput{&input},
+		VOut: []*block_proto.TXOutput{output},
+	}
+	tx.Id = hash(&tx)
 	return &tx
 }
 
-func NewTransaction(w *wallet.Wallet, to string, amount int64, uxtoSet *UTXOSet) (*Transaction, error) {
+func NewTransaction(w *wallet.Wallet, to string, amount int64, uxtoSet *UTXOSet) (*block_proto.Transaction, error) {
 	unspentOutputs, foundAmount := uxtoSet.FindSpendableOutputs(utils.HashPubKey(w.PublicKey), amount)
 	if foundAmount < amount {
 		return nil, ErrNotEnoughFunds{need: amount, found: foundAmount}
 	}
 
-	var inputs []TXInput
+	var inputs []*block_proto.TXInput
 	for txID, outputs := range unspentOutputs {
 		for _, output := range outputs {
-			inputs = append(inputs, TXInput{
+			inputs = append(inputs, &block_proto.TXInput{
 				Txid:      []byte(txID),
 				VoutIndex: output.OriginalIndex,
 			})
 		}
 	}
-	outputs := []TXOutput{{amount, nil}}
+	outputs := []*block_proto.TXOutput{{Value: amount, PubKeyHash: nil}}
 	// take the change
 	if foundAmount > amount {
-		outputs = append(outputs, TXOutput{foundAmount - amount, utils.HashPubKey(w.PublicKey)})
+		outputs = append(outputs, &block_proto.TXOutput{
+			Value:      foundAmount - amount,
+			PubKeyHash: utils.HashPubKey(w.PublicKey),
+		})
 	}
-	tx := Transaction{nil, inputs, outputs}
-	if err := tx.Sign(w.PrivateKey); err != nil {
+	tx := &block_proto.Transaction{
+		Id:   nil,
+		VIn:  inputs,
+		VOut: outputs,
+	}
+	if err := Sign(tx, w.PrivateKey); err != nil {
 		return nil, err
 	}
-	tx.ID = tx.hash()
-	return &tx, nil
+	tx.Id = hash(tx)
+	return tx, nil
 }
 
 // IsCoinbase checks whether the transaction is coinbase
-func (tx *Transaction) IsCoinbase() bool {
-	return len(tx.Vin) == 1 && len(tx.Vin[0].Txid) == 0 && tx.Vin[0].VoutIndex == -1
+func IsCoinbase(tx *block_proto.Transaction) bool {
+	return len(tx.VIn) == 1 && len(tx.VIn[0].Txid) == 0 && tx.VIn[0].VoutIndex == -1
 }
 
 // String returns a human-readable representation of a transaction
@@ -159,19 +178,19 @@ func (tx *Transaction) String() string {
 
 // in Sign() function we do not need to verify the pubkey of vin
 // because the transaction will always be valid
-func (tx *Transaction) Sign(privKey ecdsa.PrivateKey) error {
-	if tx.IsCoinbase() {
+func Sign(tx *block_proto.Transaction, privKey ecdsa.PrivateKey) error {
+	if IsCoinbase(tx) {
 		return nil
 	}
 
 	// bitcoin actually signs a trimmed copy of a tx, I don't know why
 	// here I only sign an input
-	for index := range tx.Vin {
+	for index := range tx.VIn {
 		pubkey := utils.EncodePubKey(&privKey)
 
-		tx.Vin[index].Signature = nil
-		tx.Vin[index].PubKey = pubkey
-		data, err := json.Marshal(&tx.Vin[index])
+		tx.VIn[index].Signature = nil
+		tx.VIn[index].PubKey = pubkey
+		data, err := json.Marshal(&tx.VIn[index])
 		if err != nil {
 			return err
 		}
@@ -180,12 +199,12 @@ func (tx *Transaction) Sign(privKey ecdsa.PrivateKey) error {
 		if err != nil {
 			return err
 		}
-		tx.Vin[index].Signature = sig
+		tx.VIn[index].Signature = sig
 	}
 	return nil
 }
 
-func findOutputInUXTO(unspentOutputs *map[string][]TXOutputWithMetadata, txid string, outputIndex int) *TXOutputWithMetadata {
+func findOutputInUXTO(unspentOutputs *map[string][]TXOutputWithMetadata, txid string, outputIndex int32) *TXOutputWithMetadata {
 	for id, outputs := range *unspentOutputs {
 		for _, output := range outputs {
 			if txid == id && output.OriginalIndex == outputIndex {
@@ -196,17 +215,17 @@ func findOutputInUXTO(unspentOutputs *map[string][]TXOutputWithMetadata, txid st
 	return nil
 }
 
-func (tx *Transaction) Verify(prevOutputs map[string][]TXOutputWithMetadata) (bool, error) {
-	if tx.IsCoinbase() {
+func Verify(tx *block_proto.Transaction, prevOutputs map[string][]TXOutputWithMetadata) (bool, error) {
+	if IsCoinbase(tx) {
 		return true, nil
 	}
 
-	txHash := tx.hash()
-	if !bytes.Equal(tx.ID, txHash) {
+	txHash := hash(tx)
+	if !bytes.Equal(tx.Id, txHash) {
 		return false, ErrInvalidHash
 	}
 
-	for _, vinCopy := range tx.Vin {
+	for _, vinCopy := range tx.VIn {
 		sig := vinCopy.Signature
 		vinCopy.Signature = nil
 

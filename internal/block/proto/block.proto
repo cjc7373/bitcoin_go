@@ -19,7 +19,7 @@ message TXOutput {
 }
 
 message Transaction {
-    bytes id = 1;
+    bytes id = 1; // hash of this tx
     repeated TXInput v_in = 2;
     repeated TXOutput v_out = 3;
 }
@@ -30,5 +30,5 @@ message Block {
     repeated Transaction transactions = 2;
     bytes prev_block_hash = 3;
     bytes hash = 4;
-    int32 nonce = 5;
+    int64 nonce = 5;
 }

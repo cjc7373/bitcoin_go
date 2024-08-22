@@ -2,18 +2,21 @@ package block
 
 import (
 	"encoding/json"
-	"fmt"
-	"log"
+	"iter"
+	"log/slog"
 	"time"
 
 	bolt "go.etcd.io/bbolt"
+	"google.golang.org/protobuf/proto"
 
-	"github.com/cjc7373/bitcoin_go/internal/db"
+	block_proto "github.com/cjc7373/bitcoin_go/internal/block/proto"
 	"github.com/cjc7373/bitcoin_go/internal/utils"
 )
 
 const blockBucket = "block"
 const lastBlock = "last_block"
+
+var logger = slog.Default()
 
 // in block bucket, we'll have:
 // 32-byte block hash -> block data, encoded by json
@@ -27,8 +30,14 @@ type Block struct {
 	Nonce         int
 }
 
-func NewBlock(txs *[]Transaction, prevBlockHash []byte) *Block {
-	block := &Block{time.Now().Unix(), *txs, prevBlockHash, []byte{}, 0}
+func NewBlock(txs []*block_proto.Transaction, prevBlockHash []byte) *block_proto.Block {
+	block := &block_proto.Block{
+		Timestamp:     time.Now().Unix(),
+		Transactions:  txs,
+		PrevBlockHash: prevBlockHash,
+		Hash:          nil,
+		Nonce:         0,
+	}
 	pow := NewProofOfWork(block)
 	nonce, hash := pow.Run()
 
@@ -45,7 +54,49 @@ type Blockchain struct {
 	NewBlockIterator func() utils.Iterator[*Block]
 }
 
-func (bc *Blockchain) AddBlock(txs *[]Transaction) {
+func GetBlock(db *bolt.DB, hash []byte) (*block_proto.Block, error) {
+	block := &block_proto.Block{}
+	if err := db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(blockBucket))
+		v := b.Get(hash)
+		if err := proto.Unmarshal(v, block); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return block, nil
+}
+
+func AllBlocks(db *bolt.DB, tipHash []byte) iter.Seq[*block_proto.Block] {
+	curHash := tipHash
+	return func(yield func(*block_proto.Block) bool) {
+		for len(curHash) != 0 {
+			block := &block_proto.Block{}
+			err := db.View(func(tx *bolt.Tx) error {
+				b := tx.Bucket([]byte(blockBucket))
+
+				v := b.Get(curHash)
+				if err := proto.Unmarshal(v, block); err != nil {
+					return err
+				}
+				return nil
+			})
+			if err != nil {
+				logger.Error("err iterate chain", "error", err)
+				return
+			}
+
+			curHash = block.PrevBlockHash
+			if !yield(block) {
+				return
+			}
+		}
+	}
+}
+
+func (bc *Blockchain) AddBlock(txs []*block_proto.Transaction) {
 	newBlock := NewBlock(txs, bc.TipHash)
 	err := bc.DB.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(blockBucket))
@@ -74,108 +125,6 @@ func (bc *Blockchain) AddBlock(txs *[]Transaction) {
 	}
 }
 
-// FIXME: this interface is mainly for the ease of testing
-// I wonder if there's a better way
-type BlockchainIterator struct {
-	curHash []byte
-	db      *bolt.DB
-}
-
-func (bci *BlockchainIterator) Next() bool {
-	if len(bci.curHash) == 0 {
-		return false
-	} else {
-		return true
-	}
-}
-
-func (bci *BlockchainIterator) Elem() *Block {
-	var block Block
-	err := bci.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(blockBucket))
-
-		data := b.Get(bci.curHash)
-		err := json.Unmarshal(data, &block)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	})
-	if err != nil {
-		panic(err)
-	}
-
-	bci.curHash = block.PrevBlockHash
-	return &block
-}
-
-func (bc *Blockchain) PrintChain() {
-	fmt.Println("Printing chain...")
-	iter := bc.NewBlockIterator()
-
-	for iter.Next() {
-		block := iter.Elem()
-
-		fmt.Printf("Prev. hash: %x\n", block.PrevBlockHash)
-		fmt.Printf("Transactions: \n")
-		for _, tx := range block.Transactions {
-			fmt.Println(&tx)
-		}
-		fmt.Printf("Hash: %x\n", block.Hash)
-		fmt.Println()
-	}
-
-}
-
-func NewGenesisBlock(to string) *Block {
-	return NewBlock(&[]Transaction{*NewCoinbaseTransaction(to, []byte("Genesis Block"))}, nil)
-}
-
-func NewBlockchain(conf *utils.Config, to string) *Blockchain {
-	bolt_db := db.GetDB(conf)
-	var tip []byte
-
-	err := bolt_db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(blockBucket))
-
-		if b == nil {
-			genesis := NewGenesisBlock(to)
-			log.Printf("Created genesis block with hash %x\n", genesis.Hash)
-			b, err := tx.CreateBucket([]byte(blockBucket))
-			if err != nil {
-				panic(err)
-			}
-
-			data, err := json.Marshal(genesis)
-			if err != nil {
-				panic(err)
-			}
-
-			err = b.Put(genesis.Hash, data)
-			if err != nil {
-				panic(err)
-			}
-
-			err = b.Put([]byte(lastBlock), genesis.Hash)
-			if err != nil {
-				panic(err)
-			}
-			tip = genesis.Hash
-		} else {
-			tip = b.Get([]byte(lastBlock))
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		panic(err)
-	}
-
-	blockchainIterator := func() utils.Iterator[*Block] {
-		return &BlockchainIterator{curHash: tip, db: bolt_db}
-	}
-
-	return &Blockchain{TipHash: tip, DB: bolt_db, NewBlockIterator: blockchainIterator}
+func NewGenesisBlock(to string) *block_proto.Block {
+	return NewBlock([]*block_proto.Transaction{NewCoinbaseTransaction(to, []byte("Genesis Block"))}, nil)
 }

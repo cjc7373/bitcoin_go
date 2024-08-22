@@ -20,7 +20,7 @@ type TXOutputWithMetadata struct {
 	TXOutput
 	// there are only unspent outputs in UTXO
 	// so we need this field to identify its original VoutIndex
-	OriginalIndex int
+	OriginalIndex int32
 }
 
 // find someone's enough outputs to make the tx

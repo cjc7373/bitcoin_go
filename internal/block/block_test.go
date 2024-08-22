@@ -4,9 +4,11 @@ import (
 	"os"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
+	"github.com/cjc7373/bitcoin_go/internal/db"
 	"github.com/cjc7373/bitcoin_go/internal/utils"
 	"github.com/cjc7373/bitcoin_go/internal/wallet"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestTransaction(t *testing.T) {
@@ -25,8 +27,9 @@ func TestTransaction(t *testing.T) {
 	w1 := wallet.NewWallet()
 	w2 := wallet.NewWallet()
 	conf.Wallets[defatltWalletName] = string(w1.EncodeToPEM())
+	bdb := db.GetDB(&conf)
 
-	bc := NewBlockchain(&conf, w1.GetAddress())
+	bc := NewBlockchain(bdb, w1.GetAddress())
 	utxoSet := UTXOSet{bc}
 	utxoSet.Reindex()
 	tx1, err := NewTransaction(w1, w2.GetAddress(), 100, &utxoSet)

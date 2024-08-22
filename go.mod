@@ -1,6 +1,6 @@
 module github.com/cjc7373/bitcoin_go
 
-go 1.22
+go 1.23
 
 require (
 	github.com/btcsuite/btcutil v1.0.2
