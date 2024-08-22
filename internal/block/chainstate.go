@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 
+	block_proto "github.com/cjc7373/bitcoin_go/internal/block/proto"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -17,7 +18,7 @@ type UTXOSet struct {
 }
 
 type TXOutputWithMetadata struct {
-	TXOutput
+	*block_proto.TXOutput
 	// there are only unspent outputs in UTXO
 	// so we need this field to identify its original VoutIndex
 	OriginalIndex int32
@@ -26,11 +27,11 @@ type TXOutputWithMetadata struct {
 // find someone's enough outputs to make the tx
 // FIXME: this function needs to iterate chainstate bucket, could be slow
 // return a map of someone's UXTOs, key is tx id, value is a set of TXOutputs
-func (u UTXOSet) FindSpendableOutputs(pubkeyHash []byte, amount int64) (unspentOutputs map[string][]TXOutputWithMetadata, found int64) {
+func FindSpendableOutputs(db *bolt.DB, pubkeyHash []byte, amount int64) (unspentOutputs map[string][]TXOutputWithMetadata, found int64) {
 	unspentOutputs = make(map[string][]TXOutputWithMetadata)
 	var accumulated int64 = 0
 
-	err := u.Blockchain.DB.View(func(blotTx *bolt.Tx) error {
+	err := db.View(func(blotTx *bolt.Tx) error {
 		b := blotTx.Bucket([]byte(utxoBucket))
 		c := b.Cursor()
 
@@ -61,19 +62,15 @@ func (u UTXOSet) FindSpendableOutputs(pubkeyHash []byte, amount int64) (unspentO
 }
 
 // return a map of UTXOs, key is tx id, value is a set of TXOutputs
-func (u UTXOSet) findUTXO() *map[string][]TXOutputWithMetadata {
-	blockIter := u.Blockchain.NewBlockIterator()
-
+func findUTXO(db *bolt.DB, bc *block_proto.Blockchain) *map[string][]TXOutputWithMetadata {
 	UTXO := make(map[string][]TXOutputWithMetadata) // key is tx id, value is a set of VoutIndex
-	spentOutputs := make(map[string][]int)          // key is tx id, value is a set of VoutIndex
+	spentOutputs := make(map[string][]int32)        // key is tx id, value is a set of VoutIndex
 
-	for blockIter.Next() {
-		block := blockIter.Elem()
-
+	for block := range AllBlocks(db, bc.TipHash) {
 		for _, tx := range block.Transactions {
-			id := string(tx.ID)
+			id := string(tx.Id)
 
-			for voutIndex, output := range tx.Vout {
+			for voutIndex, output := range tx.VOut {
 				spent := false
 				// if spentOutputs[id] doesn't exist, this output can't be spent
 				// because we iterate the chain from end to start
@@ -81,7 +78,7 @@ func (u UTXOSet) findUTXO() *map[string][]TXOutputWithMetadata {
 				if _, exist := spentOutputs[id]; exist {
 					// iterator spentOutputs[id] to check if this output is spent
 					for _, spentOutput := range spentOutputs[id] {
-						if spentOutput == voutIndex {
+						if spentOutput == int32(voutIndex) {
 							spent = true
 							break
 						}
@@ -89,13 +86,13 @@ func (u UTXOSet) findUTXO() *map[string][]TXOutputWithMetadata {
 				}
 
 				if !spent {
-					UTXO[id] = append(UTXO[id], TXOutputWithMetadata{TXOutput: output, OriginalIndex: voutIndex})
+					UTXO[id] = append(UTXO[id], TXOutputWithMetadata{TXOutput: output, OriginalIndex: int32(voutIndex)})
 				}
 			}
 
 			// coinbase tx doesn't spend any outputs
-			if !tx.IsCoinbase() {
-				for _, input := range tx.Vin {
+			if !IsCoinbase(tx) {
+				for _, input := range tx.VIn {
 					spentOutputs[string(input.Txid)] = append(spentOutputs[string(input.Txid)], input.VoutIndex)
 				}
 			}
@@ -106,9 +103,7 @@ func (u UTXOSet) findUTXO() *map[string][]TXOutputWithMetadata {
 }
 
 // rebuild UXTO set
-func (u UTXOSet) Reindex() {
-	db := u.Blockchain.DB
-
+func Reindex(db *bolt.DB, bc *block_proto.Blockchain) {
 	err := db.Update(func(tx *bolt.Tx) error {
 		err := tx.DeleteBucket([]byte(utxoBucket))
 		if err != nil && err != bolt.ErrBucketNotFound {
@@ -127,7 +122,7 @@ func (u UTXOSet) Reindex() {
 		panic(err)
 	}
 
-	utxo := u.findUTXO()
+	utxo := findUTXO(db, bc)
 	// update utxo in db
 	err = db.Update(func(dbTx *bolt.Tx) error {
 		b := dbTx.Bucket([]byte(utxoBucket))

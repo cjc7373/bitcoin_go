@@ -1,40 +1,25 @@
 package block
 
 import (
-	"os"
-	"testing"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 
-	"github.com/stretchr/testify/assert"
-
+	block_proto "github.com/cjc7373/bitcoin_go/internal/block/proto"
 	"github.com/cjc7373/bitcoin_go/internal/db"
-	"github.com/cjc7373/bitcoin_go/internal/utils"
 	"github.com/cjc7373/bitcoin_go/internal/wallet"
 )
 
-func TestTransaction(t *testing.T) {
-	assert := assert.New(t)
-
-	dbPath := "blockchain_test.db"
-	conf := utils.Config{
-		DBPath:  dbPath,
-		Wallets: map[string]string{},
-	}
-	t.Cleanup(func() {
-		os.Remove(dbPath)
-	})
-
-	var defatltWalletName = "default"
+var _ = Describe("block test", func() {
 	w1 := wallet.NewWallet()
 	w2 := wallet.NewWallet()
-	conf.Wallets[defatltWalletName] = string(w1.EncodeToPEM())
-	bdb := db.GetDB(&conf)
+	testConf.Wallets[testWalletName] = string(w1.EncodeToPEM())
+	bdb := db.GetDB(&testConf)
 
 	bc := NewBlockchain(bdb, w1.GetAddress())
-	utxoSet := UTXOSet{bc}
-	utxoSet.Reindex()
-	tx1, err := NewTransaction(w1, w2.GetAddress(), 100, &utxoSet)
-	assert.Nil(err)
-	tx2, err := NewTransaction(w1, w2.GetAddress(), 200, &utxoSet)
-	assert.Nil(err)
-	bc.AddBlock(&[]Transaction{*tx1, *tx2})
-}
+	Reindex(bdb, bc)
+	tx1, err := NewTransaction(bdb, w1, w2.GetAddress(), 100)
+	Expect(err).NotTo(HaveOccurred())
+	tx2, err := NewTransaction(bdb, w1, w2.GetAddress(), 200)
+	Expect(err).NotTo(HaveOccurred())
+	AddBlock(bdb, bc, []*block_proto.Transaction{tx1, tx2})
+})

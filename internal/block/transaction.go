@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/btcsuite/btcutil/base58"
+	bolt "go.etcd.io/bbolt"
 
 	block_proto "github.com/cjc7373/bitcoin_go/internal/block/proto"
 	"github.com/cjc7373/bitcoin_go/internal/utils"
@@ -112,8 +113,8 @@ func NewCoinbaseTransaction(to string, data []byte) *block_proto.Transaction {
 	return &tx
 }
 
-func NewTransaction(w *wallet.Wallet, to string, amount int64, uxtoSet *UTXOSet) (*block_proto.Transaction, error) {
-	unspentOutputs, foundAmount := uxtoSet.FindSpendableOutputs(utils.HashPubKey(w.PublicKey), amount)
+func NewTransaction(db *bolt.DB, w *wallet.Wallet, to string, amount int64) (*block_proto.Transaction, error) {
+	unspentOutputs, foundAmount := FindSpendableOutputs(db, utils.HashPubKey(w.PublicKey), amount)
 	if foundAmount < amount {
 		return nil, ErrNotEnoughFunds{need: amount, found: foundAmount}
 	}

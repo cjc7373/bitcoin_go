@@ -54,13 +54,13 @@ func NewBlockchain(bolt_db *bolt.DB, to string) *block_proto.Blockchain {
 				panic(err)
 			}
 
-			err = b.Put([]byte(lastBlock), genesis.Hash)
+			err = b.Put([]byte(lastBlockKey), genesis.Hash)
 			if err != nil {
 				panic(err)
 			}
 			tip = genesis.Hash
 		} else {
-			tip = b.Get([]byte(lastBlock))
+			tip = b.Get([]byte(lastBlockKey))
 		}
 
 		return nil

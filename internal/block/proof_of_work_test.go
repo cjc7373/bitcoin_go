@@ -5,11 +5,18 @@ import (
 	"testing"
 	"time"
 
+	block_proto "github.com/cjc7373/bitcoin_go/internal/block/proto"
 	"github.com/stretchr/testify/assert"
 )
 
-func newDumbBlock() *Block {
-	return &Block{time.Now().Unix(), []Transaction{}, []byte{}, []byte{}, 0}
+func newDumbBlock() *block_proto.Block {
+	return &block_proto.Block{
+		Timestamp:     time.Now().Unix(),
+		Transactions:  []*block_proto.Transaction{},
+		PrevBlockHash: []byte{},
+		Hash:          []byte{},
+		Nonce:         0,
+	}
 }
 
 func BenchmarkPrepareData(b *testing.B) {

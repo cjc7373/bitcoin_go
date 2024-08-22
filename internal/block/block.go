@@ -14,7 +14,7 @@ import (
 )
 
 const blockBucket = "block"
-const lastBlock = "last_block"
+const lastBlockKey = "last_block"
 
 var logger = slog.Default()
 
@@ -96,9 +96,9 @@ func AllBlocks(db *bolt.DB, tipHash []byte) iter.Seq[*block_proto.Block] {
 	}
 }
 
-func (bc *Blockchain) AddBlock(txs []*block_proto.Transaction) {
+func AddBlock(db *bolt.DB, bc *block_proto.Blockchain, txs []*block_proto.Transaction) {
 	newBlock := NewBlock(txs, bc.TipHash)
-	err := bc.DB.Update(func(tx *bolt.Tx) error {
+	err := db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(blockBucket))
 		data, err := json.Marshal(newBlock)
 		if err != nil {
@@ -110,7 +110,7 @@ func (bc *Blockchain) AddBlock(txs []*block_proto.Transaction) {
 			panic(err)
 		}
 
-		err = b.Put([]byte(lastBlock), newBlock.Hash)
+		err = b.Put([]byte(lastBlockKey), newBlock.Hash)
 		if err != nil {
 			panic(err)
 		}
