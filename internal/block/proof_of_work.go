@@ -71,7 +71,7 @@ func (pow *ProofOfWork) Run() (int64, []byte) {
 
 	fmt.Printf("Mining the block containing the following txs:\n")
 	for _, tx := range pow.block.Transactions {
-		fmt.Println(&tx)
+		fmt.Println(tx)
 	}
 	data := pow.prepareData(nonce)
 	for nonce < maxNonce {
@@ -86,8 +86,7 @@ func (pow *ProofOfWork) Run() (int64, []byte) {
 			nonce++
 		}
 	}
-	fmt.Printf("%x", hash)
-	fmt.Print("\n\n")
+	logger.Info("mining completed", "hash", fmt.Sprintf("%x", hash))
 
 	return nonce, hash[:]
 }

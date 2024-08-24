@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/cjc7373/bitcoin_go/internal/block"
+	"github.com/cjc7373/bitcoin_go/internal/db"
 	"github.com/cjc7373/bitcoin_go/internal/utils"
 	"github.com/cjc7373/bitcoin_go/internal/wallet"
 )
@@ -29,10 +30,11 @@ func main() {
 		fmt.Printf("Using existing wallet with address %v\n", w.GetAddress())
 	}
 
-	bc := block.NewBlockchain(conf, w.GetAddress())
+	bdb := db.OpenDB(conf)
+	bc := block.NewBlockchain(bdb, w.GetAddress())
 
 	// bc.AddBlock("Send 1 BTC to Ivan")
 	// bc.AddBlock("Send 2 more BTC to Ivan")
 
-	bc.PrintChain()
+	block.PrintChain(bdb, bc)
 }

@@ -12,6 +12,7 @@ import (
 
 	"github.com/btcsuite/btcutil/base58"
 	bolt "go.etcd.io/bbolt"
+	"google.golang.org/protobuf/proto"
 
 	block_proto "github.com/cjc7373/bitcoin_go/internal/block/proto"
 	"github.com/cjc7373/bitcoin_go/internal/utils"
@@ -33,22 +34,6 @@ func (err ErrNotEnoughFunds) Error() string {
 	return fmt.Sprintf("the wallet do not have enough funds, need %v, found %v", err.need, err.found)
 }
 
-type TXInput struct {
-	Txid      []byte // ID of tx this input refers
-	VoutIndex int    // index of an output in the tx
-	Signature []byte
-	PubKey    []byte
-}
-
-type TXOutput struct {
-	// stores the number of satoshis, which is 0.00000001 BTC.
-	// this is the smallest unit of currency in Bitcoin
-	Value int64
-	// we are not implementing the whole srcipt thing here, so just pubkey
-	// pubkey hash is just pubkey hash, not an address
-	PubKeyHash []byte
-}
-
 // NewTXOutput create a new TXOutput
 // trim the address to only contain pubkey hash
 func NewTXOutput(value int64, address string) *block_proto.TXOutput {
@@ -59,21 +44,11 @@ func NewTXOutput(value int64, address string) *block_proto.TXOutput {
 	return txo
 }
 
-type Transaction struct {
-	ID   []byte // hash of this tx
-	Vin  []TXInput
-	Vout []TXOutput
-}
-
-// hash returns the hash of the Transaction
-func hash(tx *block_proto.Transaction) []byte {
+// hashTx returns the hashTx of the Transaction
+func hashTx(tx *block_proto.Transaction) []byte {
 	var hash [32]byte
 
-	// TODO: why txCopy is needed?
-	txCopy := *tx
-	txCopy.Id = []byte{}
-
-	data, err := json.Marshal(&txCopy)
+	data, err := proto.Marshal(tx)
 	if err != nil {
 		panic(err)
 	}
@@ -109,7 +84,7 @@ func NewCoinbaseTransaction(to string, data []byte) *block_proto.Transaction {
 		VIn:  []*block_proto.TXInput{&input},
 		VOut: []*block_proto.TXOutput{output},
 	}
-	tx.Id = hash(&tx)
+	tx.Id = hashTx(&tx)
 	return &tx
 }
 
@@ -144,7 +119,7 @@ func NewTransaction(db *bolt.DB, w *wallet.Wallet, to string, amount int64) (*bl
 	if err := Sign(tx, w.PrivateKey); err != nil {
 		return nil, err
 	}
-	tx.Id = hash(tx)
+	tx.Id = hashTx(tx)
 	return tx, nil
 }
 
@@ -154,12 +129,12 @@ func IsCoinbase(tx *block_proto.Transaction) bool {
 }
 
 // String returns a human-readable representation of a transaction
-func (tx *Transaction) String() string {
+func String(tx block_proto.Transaction) string {
 	var lines []string
 
-	lines = append(lines, fmt.Sprintf("--- Transaction %x:", tx.ID))
+	lines = append(lines, fmt.Sprintf("--- Transaction %x:", tx.Id))
 
-	for i, input := range tx.Vin {
+	for i, input := range tx.VIn {
 
 		lines = append(lines, fmt.Sprintf("     Input %d:", i))
 		lines = append(lines, fmt.Sprintf("       TXID:      %x", input.Txid))
@@ -168,7 +143,7 @@ func (tx *Transaction) String() string {
 		lines = append(lines, fmt.Sprintf("       PubKey:    %x", input.PubKey))
 	}
 
-	for i, output := range tx.Vout {
+	for i, output := range tx.VOut {
 		lines = append(lines, fmt.Sprintf("     Output %d:", i))
 		lines = append(lines, fmt.Sprintf("       Value:  %d", output.Value))
 		lines = append(lines, fmt.Sprintf("       PubKeyHash: %x", output.PubKeyHash))
@@ -191,7 +166,7 @@ func Sign(tx *block_proto.Transaction, privKey ecdsa.PrivateKey) error {
 
 		tx.VIn[index].Signature = nil
 		tx.VIn[index].PubKey = pubkey
-		data, err := json.Marshal(&tx.VIn[index])
+		data, err := proto.Marshal(tx.VIn[index])
 		if err != nil {
 			return err
 		}
@@ -221,7 +196,7 @@ func Verify(tx *block_proto.Transaction, prevOutputs map[string][]TXOutputWithMe
 		return true, nil
 	}
 
-	txHash := hash(tx)
+	txHash := hashTx(tx)
 	if !bytes.Equal(tx.Id, txHash) {
 		return false, ErrInvalidHash
 	}

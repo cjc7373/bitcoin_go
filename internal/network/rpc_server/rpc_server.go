@@ -45,7 +45,7 @@ func NewRPCServer(logger *slog.Logger, config *utils.Config) BitcoinServer {
 
 		done: make(chan error),
 
-		DB: db.GetDB(config),
+		DB: db.OpenDB(config),
 	}
 }
 

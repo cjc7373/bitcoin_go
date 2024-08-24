@@ -4,18 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 
-	block_proto "github.com/cjc7373/bitcoin_go/internal/block/proto"
 	bolt "go.etcd.io/bbolt"
-)
 
-const utxoBucket = "chainstate"
+	block_proto "github.com/cjc7373/bitcoin_go/internal/block/proto"
+	"github.com/cjc7373/bitcoin_go/internal/common"
+)
 
 // in uxto bucket, we'll have:
 // 32-byte tx hash -> []int, stores unspent output indexes in that tx
-
-type UTXOSet struct {
-	Blockchain *Blockchain
-}
 
 type TXOutputWithMetadata struct {
 	*block_proto.TXOutput
@@ -32,7 +28,7 @@ func FindSpendableOutputs(db *bolt.DB, pubkeyHash []byte, amount int64) (unspent
 	var accumulated int64 = 0
 
 	err := db.View(func(blotTx *bolt.Tx) error {
-		b := blotTx.Bucket([]byte(utxoBucket))
+		b := blotTx.Bucket([]byte(common.UTXOBucket))
 		c := b.Cursor()
 
 		for k, v := c.First(); k != nil; k, v = c.Next() {
@@ -105,12 +101,12 @@ func findUTXO(db *bolt.DB, bc *block_proto.Blockchain) *map[string][]TXOutputWit
 // rebuild UXTO set
 func Reindex(db *bolt.DB, bc *block_proto.Blockchain) {
 	err := db.Update(func(tx *bolt.Tx) error {
-		err := tx.DeleteBucket([]byte(utxoBucket))
+		err := tx.DeleteBucket([]byte(common.UTXOBucket))
 		if err != nil && err != bolt.ErrBucketNotFound {
 			panic(err)
 		}
 
-		_, err = tx.CreateBucket([]byte(utxoBucket))
+		_, err = tx.CreateBucket([]byte(common.UTXOBucket))
 		if err != nil {
 			panic(err)
 		}
@@ -125,7 +121,7 @@ func Reindex(db *bolt.DB, bc *block_proto.Blockchain) {
 	utxo := findUTXO(db, bc)
 	// update utxo in db
 	err = db.Update(func(dbTx *bolt.Tx) error {
-		b := dbTx.Bucket([]byte(utxoBucket))
+		b := dbTx.Bucket([]byte(common.UTXOBucket))
 
 		for k, v := range *utxo {
 			data, err := json.Marshal(&v)
