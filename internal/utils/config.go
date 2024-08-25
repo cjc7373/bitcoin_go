@@ -55,7 +55,7 @@ func ParseConfig(dataDir string) *Config {
 	if conf.Wallets == nil {
 		conf.Wallets = make(map[string]string)
 	}
-	conf.dataDir = configPath
+	conf.dataDir = dataDir
 
 	return &conf
 }

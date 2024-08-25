@@ -1,0 +1,4 @@
+dbpath: blockchain.db
+wallets:
+    default: |
+      foo

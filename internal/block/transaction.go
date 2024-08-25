@@ -5,7 +5,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/sha256"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -48,7 +47,12 @@ func NewTXOutput(value int64, address string) *block_proto.TXOutput {
 func hashTx(tx *block_proto.Transaction) []byte {
 	var hash [32]byte
 
-	data, err := proto.Marshal(tx)
+	// hashTx will be used in both partial tx and finished tx,
+	// so tx's hash might already exists. Remove it first.
+	txCopy := proto.Clone(tx).(*block_proto.Transaction)
+	txCopy.Id = []byte{}
+
+	data, err := proto.Marshal(txCopy)
 	if err != nil {
 		panic(err)
 	}
@@ -63,7 +67,7 @@ const subsidy = 10000
 // create a new tx, which has an output to reward the miner
 // this output
 func NewCoinbaseTransaction(to string, data []byte) *block_proto.Transaction {
-	if data != nil {
+	if data == nil {
 		// create an empty input to make the hash change every time
 		data = make([]byte, 10)
 		_, err := rand.Read(data)
@@ -201,7 +205,8 @@ func Verify(tx *block_proto.Transaction, prevOutputs map[string][]TXOutputWithMe
 		return false, ErrInvalidHash
 	}
 
-	for _, vinCopy := range tx.VIn {
+	for _, vin := range tx.VIn {
+		vinCopy := proto.Clone(vin).(*block_proto.TXInput)
 		sig := vinCopy.Signature
 		vinCopy.Signature = nil
 
@@ -210,7 +215,7 @@ func Verify(tx *block_proto.Transaction, prevOutputs map[string][]TXOutputWithMe
 			return false, ErrPubKeyMismatch
 		}
 
-		data, err := json.Marshal(&vinCopy)
+		data, err := proto.Marshal(vinCopy)
 		if err != nil {
 			panic(err)
 		}

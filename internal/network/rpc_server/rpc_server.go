@@ -68,6 +68,7 @@ func (d *BitcoinServer) Serve() error {
 
 func (d *BitcoinServer) Stop() {
 	d.grpcServer.GracefulStop()
+	d.DB.Close()
 }
 
 func (d *BitcoinServer) GetConnectedNodes() map[string]*network.Node {

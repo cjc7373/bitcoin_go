@@ -3,33 +3,37 @@ package utils
 import (
 	"fmt"
 	"strings"
-	"testing"
 
-	"github.com/stretchr/testify/assert"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
 	"gopkg.in/yaml.v3"
 )
 
-func TestYaml(t *testing.T) {
-	type T struct {
-		A string
-		B []byte
-		C map[string]string
+var _ = Describe("config test", func() {
+	It("tests yaml", func() {
+		type T struct {
+			A string
+			B []byte
+			C map[string]string
 
-		unexported string
-	}
+			unexported string
+		}
 
-	data := T{"xxx", []byte("xaaaa"), map[string]string{"key": "v1", "k3": "v3"}, "foo"}
-	out, _ := yaml.Marshal(data)
-	fmt.Println(out)
-	var m T
-	err := yaml.Unmarshal(out, &m)
-	fmt.Println(err, m)
-}
+		data := T{"xxx", []byte("xaaaa"), map[string]string{"key": "v1", "k3": "v3"}, "foo"}
+		out, _ := yaml.Marshal(data)
+		fmt.Println(out)
+		var m T
+		err := yaml.Unmarshal(out, &m)
+		fmt.Println(err, m)
+	})
 
-func TestParseConfig(t *testing.T) {
-	assert := assert.New(t)
-	config := ParseConfig("./testdata")
+	It("parses config", func() {
+		dataDir := "./testdata"
+		config := ParseConfig(dataDir)
 
-	assert.Equal("blockchain.db", config.DBPath)
-	assert.Equal("foo", strings.TrimSpace(config.Wallets["default"]))
-}
+		Expect(config.DBPath).To(Equal("blockchain.db"))
+		Expect(strings.TrimSpace(config.Wallets["default"])).To(Equal("foo"))
+		Expect(config.dataDir).To(Equal(dataDir))
+	})
+})

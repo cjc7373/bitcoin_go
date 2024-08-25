@@ -1,4 +1,5 @@
 config.yaml
+!internal/utils/testdata/config.yaml
 blockchain.db
 data/
 .vscode

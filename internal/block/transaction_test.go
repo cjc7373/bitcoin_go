@@ -33,19 +33,19 @@ var _ = Describe("transaction test", func() {
 		tx.Id = hashTx(tx)
 
 		res, err := Verify(tx, unspentOutputs)
-		Expect(res).To(BeTrue())
 		Expect(err).NotTo(HaveOccurred())
+		Expect(res).To(BeTrue())
 
 		// we tamper a signature, leaving the tx hash incorrect
 		tx.VIn[0].Signature = tx.VIn[0].Signature[1:]
 		res, err = Verify(tx, unspentOutputs)
-		Expect(res).To(BeFalse())
 		Expect(err).To(Equal(ErrInvalidHash))
+		Expect(res).To(BeFalse())
 
 		// we correct the hash
 		tx.Id = hashTx(tx)
 		res, err = Verify(tx, unspentOutputs)
-		Expect(res).To(BeFalse())
 		Expect(err).To(Equal(ErrInvalidSignature))
+		Expect(res).To(BeFalse())
 	})
 })

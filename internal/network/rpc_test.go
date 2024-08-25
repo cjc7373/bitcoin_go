@@ -3,6 +3,7 @@ package network_test
 import (
 	"fmt"
 	"log/slog"
+	"os"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -13,19 +14,19 @@ import (
 
 var _ = Describe("RPC test", func() {
 	var rpcServers []*rpc_server.BitcoinServer
-	var configs []utils.Config
+	var configs []*utils.Config
 	var nodeNum = 5
 	BeforeEach(func() {
 		rpcServers = make([]*rpc_server.BitcoinServer, 0)
-		configs = make([]utils.Config, 0)
+		configs = make([]*utils.Config, 0)
 		logger := slog.Default()
 		for i := range nodeNum {
-			config := utils.Config{
-				ListenAddr: fmt.Sprintf("127.0.0.1:1220%v", i),
-				NodeName:   fmt.Sprintf("node%v", i),
-			}
+			config := utils.ParseConfig(fmt.Sprintf("./testdata/%v", i))
+			config.ListenAddr = fmt.Sprintf("127.0.0.1:1220%v", i)
+			config.NodeName = fmt.Sprintf("node%v", i)
+
 			configs = append(configs, config)
-			rpcServer := rpc_server.NewRPCServer(logger.With("node", config.NodeName), &config)
+			rpcServer := rpc_server.NewRPCServer(logger.With("node", config.NodeName), config)
 			rpcServer.Serve()
 			rpcServers = append(rpcServers, &rpcServer)
 		}
@@ -34,6 +35,11 @@ var _ = Describe("RPC test", func() {
 	AfterEach(func() {
 		for _, rpcServer := range rpcServers {
 			rpcServer.Stop()
+		}
+		for i := range nodeNum {
+			if err := os.RemoveAll(fmt.Sprintf("testdata/%v", i)); err != nil {
+				panic(err)
+			}
 		}
 		rpcServers = nil
 		configs = nil

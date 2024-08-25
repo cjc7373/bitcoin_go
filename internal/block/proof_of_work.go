@@ -13,12 +13,13 @@ import (
 	"github.com/cjc7373/bitcoin_go/internal/utils"
 )
 
+const maxNonce = math.MaxInt64
+
 // The difficulty to mine
 // It's the leading zeros of the result hash
 // like 0x000000abcd...
 // We won’t implement a target adjusting algorithm for simplicity
-const targetBits = 16
-const maxNonce = math.MaxInt64
+var targetBits = 16
 
 // in nodes we will deliberately add some latency to make pow slow
 // so that it won't actually consume much CPU time
@@ -59,7 +60,6 @@ func (pow *ProofOfWork) prepareData(nonce int64) []byte {
 }
 
 func (pow *ProofOfWork) setNonce(data []byte, nonce int64) []byte {
-	time.Sleep(PowSleepTime)
 	trimmedData := data[:len(data)-8]
 	return append(trimmedData, utils.IntToHex(nonce)...)
 }
@@ -85,6 +85,8 @@ func (pow *ProofOfWork) Run() (int64, []byte) {
 		} else {
 			nonce++
 		}
+
+		time.Sleep(PowSleepTime)
 	}
 	logger.Info("mining completed", "hash", fmt.Sprintf("%x", hash))
 

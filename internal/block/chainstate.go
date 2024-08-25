@@ -10,9 +10,6 @@ import (
 	"github.com/cjc7373/bitcoin_go/internal/common"
 )
 
-// in uxto bucket, we'll have:
-// 32-byte tx hash -> []int, stores unspent output indexes in that tx
-
 type TXOutputWithMetadata struct {
 	*block_proto.TXOutput
 	// there are only unspent outputs in UTXO
