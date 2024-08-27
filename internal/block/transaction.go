@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/btcsuite/btcutil/base58"
 	bolt "go.etcd.io/bbolt"
 	"google.golang.org/protobuf/proto"
 
@@ -35,8 +34,7 @@ func (err ErrNotEnoughFunds) Error() string {
 // NewTXOutput create a new TXOutput
 // trim the address to only contain pubkey hash
 func NewTXOutput(value int64, address wallet.Address) *block_proto.TXOutput {
-	addressBytes := base58.Decode(string(address))
-	pubkeyHash := addressBytes[1 : len(addressBytes)-4]
+	pubkeyHash := wallet.GetPubKey(address)
 
 	txo := &block_proto.TXOutput{Value: value, PubKeyHash: pubkeyHash}
 	return txo

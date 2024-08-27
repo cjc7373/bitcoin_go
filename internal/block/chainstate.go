@@ -5,9 +5,13 @@ import (
 	"encoding/json"
 
 	bolt "go.etcd.io/bbolt"
+	"google.golang.org/protobuf/proto"
 
 	block_proto "github.com/cjc7373/bitcoin_go/internal/block/proto"
 	"github.com/cjc7373/bitcoin_go/internal/common"
+	bitcoin_db "github.com/cjc7373/bitcoin_go/internal/db"
+	"github.com/cjc7373/bitcoin_go/internal/utils"
+	"github.com/cjc7373/bitcoin_go/internal/wallet"
 )
 
 type TXOutputWithMetadata struct {
@@ -64,13 +68,33 @@ func RevertBlockFromChainstate() {
 	//TODO
 }
 
-// return a map of UTXOs, key is tx id, value is a set of TXOutputs
-func findUTXO(db *bolt.DB, bc *block_proto.Blockchain) *map[string][]TXOutputWithMetadata {
-	UTXO := make(map[string][]TXOutputWithMetadata) // key is tx id, value is a set of VoutIndex
-	spentOutputs := make(map[string][]int32)        // key is tx id, value is a set of VoutIndex
+// Normally this should not be called
+func RebuildChainState(db *bolt.DB) error {
+	bc, err := GetBlockchain(db)
+	if err != nil {
+		return err
+	}
+	if err := bitcoin_db.DeleteCacheBucket(db); err != nil {
+		return err
+	}
+
+	// map of every address's utxo set
+	allUTXOsets := make(map[utils.PubKeyHashSized]*block_proto.UTXOSet)
+	spentOutputs := make(map[string]utils.Set[int]) // key is tx id, value is a set of VoutIndex
 
 	for block := range AllBlocks(db, bc.TipHash) {
 		for _, tx := range block.Transactions {
+			if err := db.Update(func(dbTx *bolt.Tx) error {
+				b := dbTx.Bucket(common.TransactionBucket)
+				v, err := proto.Marshal(tx)
+				if err != nil {
+					return err
+				}
+				return b.Put(tx.Id, v)
+			}); err != nil {
+				return err
+			}
+
 			id := string(tx.Id)
 
 			for voutIndex, output := range tx.VOut {
@@ -80,75 +104,91 @@ func findUTXO(db *bolt.DB, bc *block_proto.Blockchain) *map[string][]TXOutputWit
 				// Note: here we are assuming that an output will not be spent in the same block
 				if _, exist := spentOutputs[id]; exist {
 					// iterator spentOutputs[id] to check if this output is spent
-					for _, spentOutput := range spentOutputs[id] {
-						if spentOutput == int32(voutIndex) {
-							spent = true
-							break
-						}
+					if spentOutputs[id].Has(voutIndex) {
+						spent = true
 					}
 				}
 
 				if !spent {
-					UTXO[id] = append(UTXO[id], TXOutputWithMetadata{TXOutput: output, OriginalIndex: int32(voutIndex)})
+					h := utils.PubKeyHashSized(output.PubKeyHash)
+					if allUTXOsets[h] == nil {
+						allUTXOsets[h] = &block_proto.UTXOSet{
+							UTXOs: make([]*block_proto.UTXO, 0),
+						}
+					}
+					allUTXOsets[h].UTXOs = append(allUTXOsets[h].UTXOs, &block_proto.UTXO{
+						Transaction: tx.Id,
+						OutputIndex: int32(voutIndex),
+					})
 				}
 			}
 
 			// coinbase tx doesn't spend any outputs
 			if !IsCoinbase(tx) {
 				for _, input := range tx.VIn {
-					spentOutputs[string(input.Txid)] = append(spentOutputs[string(input.Txid)], input.VoutIndex)
+					spentOutputs[string(input.Txid)].Insert(int(input.VoutIndex))
 				}
 			}
 		}
 	}
 
-	return &UTXO
+	return db.Update(func(dbTx *bolt.Tx) error {
+		b := dbTx.Bucket(common.UTXOBucket)
+		for pubKey, utxoSet := range allUTXOsets {
+			v, err := proto.Marshal(utxoSet)
+			if err != nil {
+				return err
+			}
+			if err := b.Put(pubKey[:], v); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
-// rebuild UXTO set
-func Reindex(db *bolt.DB, bc *block_proto.Blockchain) {
-	err := db.Update(func(tx *bolt.Tx) error {
-		err := tx.DeleteBucket([]byte(common.UTXOBucket))
-		if err != nil && err != bolt.ErrBucketNotFound {
-			panic(err)
+func GetTransaction(db *bolt.DB, hash []byte) (*block_proto.Transaction, error) {
+	tx := &block_proto.Transaction{}
+	if err := db.View(func(dbTx *bolt.Tx) error {
+		b := dbTx.Bucket(common.TransactionBucket)
+		v := b.Get(hash)
+		if v == nil {
+			return nil
 		}
+		return proto.Unmarshal(v, tx)
+	}); err != nil {
+		return nil, err
+	}
+	return tx, nil
+}
 
-		_, err = tx.CreateBucket([]byte(common.UTXOBucket))
+func getUTXOSet(db *bolt.DB, addr wallet.Address) (*block_proto.UTXOSet, error) {
+	utxoSet := &block_proto.UTXOSet{}
+	if err := db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(common.UTXOBucket)
+		v := b.Get(wallet.GetPubKey(addr))
+		if v == nil {
+			return nil
+		}
+		return proto.Unmarshal(v, utxoSet)
+	}); err != nil {
+		return nil, err
+	}
+	return utxoSet, nil
+}
+
+func GetBalance(db *bolt.DB, addr wallet.Address) (amount int64, err error) {
+	utxoSet, err := getUTXOSet(db, addr)
+	if err != nil {
+		return
+	}
+
+	for _, utxo := range utxoSet.UTXOs {
+		tx, err := GetTransaction(db, utxo.Transaction)
 		if err != nil {
-			panic(err)
+			return 0, err
 		}
-
-		return nil
-	})
-
-	if err != nil {
-		panic(err)
+		amount += tx.VOut[utxo.OutputIndex].Value
 	}
-
-	utxo := findUTXO(db, bc)
-	// update utxo in db
-	err = db.Update(func(dbTx *bolt.Tx) error {
-		b := dbTx.Bucket([]byte(common.UTXOBucket))
-
-		for k, v := range *utxo {
-			data, err := json.Marshal(&v)
-			if err != nil {
-				return err
-			}
-			err = b.Put([]byte(k), data)
-			if err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-func GetBalance(addr string) {
-
+	return
 }

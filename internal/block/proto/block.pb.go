@@ -155,7 +155,7 @@ type Transaction struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Id   []byte      `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Id   []byte      `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"` // hash of this tx
 	VIn  []*TXInput  `protobuf:"bytes,2,rep,name=v_in,json=vIn,proto3" json:"v_in,omitempty"`
 	VOut []*TXOutput `protobuf:"bytes,3,rep,name=v_out,json=vOut,proto3" json:"v_out,omitempty"`
 }

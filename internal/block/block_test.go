@@ -18,7 +18,7 @@ var _ = Describe("block test", func() {
 
 		bc, err := NewBlockchain(testDB, w1.GetAddress())
 		Expect(err).NotTo(HaveOccurred())
-		Reindex(testDB, bc)
+		RebuildChainState(testDB)
 		tx1, err := NewTransaction(testDB, w1, w2.GetAddress(), 100)
 		Expect(err).NotTo(HaveOccurred())
 		tx2, err := NewTransaction(testDB, w1, w2.GetAddress(), 200)

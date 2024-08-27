@@ -48,6 +48,7 @@ func GetBlock(db *bolt.DB, hash []byte) (*block_proto.Block, error) {
 	return block, nil
 }
 
+// iterate blocks from end to start
 func AllBlocks(db *bolt.DB, tipHash []byte) iter.Seq[*block_proto.Block] {
 	curHash := tipHash
 	return func(yield func(*block_proto.Block) bool) {

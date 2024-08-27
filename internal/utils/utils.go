@@ -38,6 +38,9 @@ func ParsePubKey(pubkey []byte) *ecdsa.PublicKey {
 	return &ecdsa.PublicKey{Curve: curve, X: &x, Y: &y}
 }
 
+type PubKeyHash []byte
+type PubKeyHashSized [ripemd160.Size]byte
+
 func HashPubKey(pubKey []byte) []byte {
 	publicSHA256 := sha256.Sum256(pubKey)
 
@@ -50,4 +53,26 @@ func HashPubKey(pubKey []byte) []byte {
 	publicRIPEMD160 := RIPEMD160Hasher.Sum(nil)
 
 	return publicRIPEMD160
+}
+
+type Empty struct{}
+
+type Set[T comparable] map[T]Empty
+
+func (s Set[T]) Insert(items ...T) Set[T] {
+	for _, item := range items {
+		s[item] = Empty{}
+	}
+	return s
+}
+
+func New[T comparable](items ...T) Set[T] {
+	ss := make(Set[T], len(items))
+	ss.Insert(items...)
+	return ss
+}
+
+func (s Set[T]) Has(item T) bool {
+	_, contained := s[item]
+	return contained
 }

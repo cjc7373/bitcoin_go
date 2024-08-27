@@ -34,3 +34,25 @@ func OpenDB(conf *utils.Config) *bolt.DB {
 
 	return db
 }
+
+func DeleteCacheBucket(db *bolt.DB) error {
+	err := db.Update(func(tx *bolt.Tx) error {
+		err := tx.DeleteBucket([]byte(common.UTXOBucket))
+		if err != nil && err != bolt.ErrBucketNotFound {
+			return err
+		}
+		err = tx.DeleteBucket([]byte(common.TransactionBucket))
+		if err != nil && err != bolt.ErrBucketNotFound {
+			return err
+		}
+
+		if _, err := tx.CreateBucketIfNotExists(common.UTXOBucket); err != nil {
+			return err
+		}
+		if _, err := tx.CreateBucketIfNotExists(common.TransactionBucket); err != nil {
+			return err
+		}
+		return nil
+	})
+	return err
+}

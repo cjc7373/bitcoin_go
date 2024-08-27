@@ -83,3 +83,9 @@ func (w *Wallet) GetAddress() Address {
 
 	return Address(address)
 }
+
+func GetPubKey(address Address) utils.PubKeyHash {
+	addressBytes := base58.Decode(string(address))
+	pubkeyHash := addressBytes[1 : len(addressBytes)-4]
+	return pubkeyHash
+}

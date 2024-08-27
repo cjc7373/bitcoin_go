@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+option go_package = "github.com/cjc7373/bitcoin_go/internal/block/proto";
+
+message UTXO {
+    bytes transaction = 1;
+    int32 output_index = 2;
+}
+
+message UTXOSet {
+    repeated UTXO UTXOs = 1;
+}

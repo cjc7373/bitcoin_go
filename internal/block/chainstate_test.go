@@ -7,17 +7,18 @@ import (
 	. "github.com/onsi/gomega"
 
 	block_proto "github.com/cjc7373/bitcoin_go/internal/block/proto"
+	"github.com/cjc7373/bitcoin_go/internal/wallet"
 )
 
-func newFakeBlockchain() *block_proto.Blockchain {
+func newFakeBlockchain(addr wallet.Address) *block_proto.Blockchain {
 	tx1 := block_proto.Transaction{
 		Id: []byte("1"),
 		VIn: []*block_proto.TXInput{
 			{VoutIndex: -1},
 		},
 		VOut: []*block_proto.TXOutput{
-			{Value: 100},
-			{Value: 200},
+			NewTXOutput(100, addr),
+			NewTXOutput(200, addr),
 		},
 	}
 	tx2 := block_proto.Transaction{
@@ -26,10 +27,10 @@ func newFakeBlockchain() *block_proto.Blockchain {
 			{Txid: []byte("1"), VoutIndex: 1},
 		},
 		VOut: []*block_proto.TXOutput{
-			{Value: 1},
-			{Value: 2},
-			{Value: 3},
-			{Value: 4},
+			NewTXOutput(1, addr),
+			NewTXOutput(2, addr),
+			NewTXOutput(3, addr),
+			NewTXOutput(4, addr),
 		},
 	}
 	tx3 := block_proto.Transaction{
@@ -39,9 +40,9 @@ func newFakeBlockchain() *block_proto.Blockchain {
 			{Txid: []byte("2"), VoutIndex: 0},
 		},
 		VOut: []*block_proto.TXOutput{
-			{Value: 1},
-			{Value: 2},
-			{Value: 3},
+			NewTXOutput(1, addr),
+			NewTXOutput(2, addr),
+			NewTXOutput(3, addr),
 		},
 	}
 	tx4 := block_proto.Transaction{
@@ -52,7 +53,7 @@ func newFakeBlockchain() *block_proto.Blockchain {
 			{Txid: []byte("2"), VoutIndex: 2},
 		},
 		VOut: []*block_proto.TXOutput{
-			{Value: 1},
+			NewTXOutput(1, addr),
 		},
 	}
 	bc := &block_proto.Blockchain{}
@@ -73,15 +74,23 @@ func newFakeBlockchain() *block_proto.Blockchain {
 
 var _ = Describe("chainstate test", func() {
 	It("passes", func() {
-		bc := newFakeBlockchain()
-		utxo := findUTXO(testDB, bc)
-		// for k, v := range *utxo {
-		// 	fmt.Println(k, v)
-		// }
+		w1 := wallet.NewWallet()
+		_ = newFakeBlockchain(w1.GetAddress())
+		Expect(RebuildChainState(testDB)).To(Succeed())
 
-		Expect((*utxo)["4"][0].OriginalIndex).To(BeEquivalentTo(0))
-		Expect((*utxo)["3"][0].OriginalIndex).To(BeEquivalentTo(0))
-		Expect((*utxo)["2"][0].OriginalIndex).To(BeEquivalentTo(1))
-		Expect((*utxo)["2"][1].OriginalIndex).To(BeEquivalentTo(3))
+		utxoSet, err := getUTXOSet(testDB, w1.GetAddress())
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(utxoSet.UTXOs[0].Transaction).To(BeEquivalentTo("4"))
+		Expect(utxoSet.UTXOs[0].OutputIndex).To(BeEquivalentTo(0))
+
+		Expect(utxoSet.UTXOs[0].Transaction).To(BeEquivalentTo("3"))
+		Expect(utxoSet.UTXOs[0].OutputIndex).To(BeEquivalentTo(0))
+
+		Expect(utxoSet.UTXOs[0].Transaction).To(BeEquivalentTo("2"))
+		Expect(utxoSet.UTXOs[0].OutputIndex).To(BeEquivalentTo(3))
+
+		Expect(utxoSet.UTXOs[0].Transaction).To(BeEquivalentTo("2"))
+		Expect(utxoSet.UTXOs[0].OutputIndex).To(BeEquivalentTo(1))
 	})
 })
