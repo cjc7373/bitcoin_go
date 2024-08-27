@@ -2,6 +2,7 @@ package block
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -64,31 +65,37 @@ func (pow *ProofOfWork) setNonce(data []byte, nonce int64) []byte {
 	return append(trimmedData, utils.IntToHex(nonce)...)
 }
 
-func (pow *ProofOfWork) Run() (int64, []byte) {
+func (pow *ProofOfWork) Run(ctx context.Context) (int64, []byte, error) {
 	var hashInt big.Int
 	var hash [32]byte
 	var nonce int64
 
-	fmt.Printf("Mining the block containing the following txs:\n")
+	logger.Info("Mining started")
 	for _, tx := range pow.block.Transactions {
-		fmt.Println(tx)
+		logger.Info("With transaction", "tx", (*block_proto.TransactionPretty)(tx))
 	}
 	data := pow.prepareData(nonce)
 	for nonce < maxNonce {
-		data := pow.setNonce(data, nonce)
-		// we won't use key derivation functions like PBKDF2 and scrypt for simplicity
-		hash = sha256.Sum256(data)
-		hashInt.SetBytes(hash[:])
+		select {
+		case <-ctx.Done():
+			logger.Info("Mining stopped", "err", ctx.Err())
+			return 0, nil, ctx.Err()
+		default:
+			data := pow.setNonce(data, nonce)
+			// we won't use key derivation functions like PBKDF2 and scrypt for simplicity
+			hash = sha256.Sum256(data)
+			hashInt.SetBytes(hash[:])
 
-		if hashInt.Cmp(pow.target) == -1 {
-			break
-		} else {
-			nonce++
+			if hashInt.Cmp(pow.target) == -1 {
+				break
+			} else {
+				nonce++
+			}
+
+			time.Sleep(PowSleepTime)
 		}
-
-		time.Sleep(PowSleepTime)
 	}
 	logger.Info("mining completed", "hash", fmt.Sprintf("%x", hash))
 
-	return nonce, hash[:]
+	return nonce, hash[:], nil
 }

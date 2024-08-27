@@ -64,7 +64,9 @@ func (w *Wallet) EncodeToPEM() []byte {
 
 }
 
-func (w *Wallet) GetAddress() string {
+type Address string
+
+func (w *Wallet) GetAddress() Address {
 	// we try to generate a legal bitcoin address here, so we follow the protocol
 	// https://en.bitcoin.it/wiki/Protocol_documentation#Addresses
 	pubKeyHash := utils.HashPubKey(w.PublicKey)
@@ -79,5 +81,5 @@ func (w *Wallet) GetAddress() string {
 	fullPayload := append(versionedPayload, checksum...)
 	address := base58.Encode(fullPayload)
 
-	return address
+	return Address(address)
 }

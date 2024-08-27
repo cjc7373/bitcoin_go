@@ -1,6 +1,7 @@
 package block
 
 import (
+	"context"
 	"iter"
 	"time"
 
@@ -9,9 +10,10 @@ import (
 
 	block_proto "github.com/cjc7373/bitcoin_go/internal/block/proto"
 	"github.com/cjc7373/bitcoin_go/internal/common"
+	"github.com/cjc7373/bitcoin_go/internal/wallet"
 )
 
-func newBlock(txs []*block_proto.Transaction, prevBlockHash []byte) *block_proto.Block {
+func newBlock(ctx context.Context, txs []*block_proto.Transaction, prevBlockHash []byte) *block_proto.Block {
 	block := &block_proto.Block{
 		Timestamp:     time.Now().Unix(),
 		Transactions:  txs,
@@ -20,7 +22,10 @@ func newBlock(txs []*block_proto.Transaction, prevBlockHash []byte) *block_proto
 		Nonce:         0,
 	}
 	pow := NewProofOfWork(block)
-	nonce, hash := pow.Run()
+	nonce, hash, err := pow.Run(ctx)
+	if err != nil {
+		return nil
+	}
 
 	block.Hash = hash[:]
 	block.Nonce = nonce
@@ -83,8 +88,8 @@ func saveBlock(tx *bolt.Tx, newBlock *block_proto.Block) error {
 	return nil
 }
 
-func AddBlock(db *bolt.DB, bc *block_proto.Blockchain, txs []*block_proto.Transaction) (*block_proto.Block, error) {
-	block := newBlock(txs, bc.TipHash)
+func AddBlock(ctx context.Context, db *bolt.DB, bc *block_proto.Blockchain, txs []*block_proto.Transaction) (*block_proto.Block, error) {
+	block := newBlock(ctx, txs, bc.TipHash)
 	err := db.Update(func(tx *bolt.Tx) error {
 		if err := saveBlock(tx, block); err != nil {
 			return err
@@ -102,10 +107,10 @@ func AddBlock(db *bolt.DB, bc *block_proto.Blockchain, txs []*block_proto.Transa
 	return block, err
 }
 
-func AddGenesisBlock(db *bolt.DB, to string) error {
+func AddGenesisBlock(db *bolt.DB, to wallet.Address) error {
 	// genesis block's prevHash is nil
 	bc := &block_proto.Blockchain{}
 	txs := []*block_proto.Transaction{NewCoinbaseTransaction(to, []byte("Genesis Block"))}
-	_, err := AddBlock(db, bc, txs)
+	_, err := AddBlock(context.Background(), db, bc, txs)
 	return err
 }

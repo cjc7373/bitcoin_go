@@ -54,6 +54,16 @@ func FindSpendableOutputs(db *bolt.DB, pubkeyHash []byte, amount int64) (unspent
 	return unspentOutputs, accumulated
 }
 
+func AddBlockToChainstate() {
+	//TODO
+}
+
+// if multiple blocks will be reverted, they should be in the reverse order
+// of the blockchain
+func RevertBlockFromChainstate() {
+	//TODO
+}
+
 // return a map of UTXOs, key is tx id, value is a set of TXOutputs
 func findUTXO(db *bolt.DB, bc *block_proto.Blockchain) *map[string][]TXOutputWithMetadata {
 	UTXO := make(map[string][]TXOutputWithMetadata) // key is tx id, value is a set of VoutIndex
@@ -137,4 +147,8 @@ func Reindex(db *bolt.DB, bc *block_proto.Blockchain) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func GetBalance(addr string) {
+
 }

@@ -7,7 +7,6 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/btcsuite/btcutil/base58"
 	bolt "go.etcd.io/bbolt"
@@ -35,8 +34,8 @@ func (err ErrNotEnoughFunds) Error() string {
 
 // NewTXOutput create a new TXOutput
 // trim the address to only contain pubkey hash
-func NewTXOutput(value int64, address string) *block_proto.TXOutput {
-	addressBytes := base58.Decode(address)
+func NewTXOutput(value int64, address wallet.Address) *block_proto.TXOutput {
+	addressBytes := base58.Decode(string(address))
 	pubkeyHash := addressBytes[1 : len(addressBytes)-4]
 
 	txo := &block_proto.TXOutput{Value: value, PubKeyHash: pubkeyHash}
@@ -66,7 +65,7 @@ const subsidy = 10000
 
 // create a new tx, which has an output to reward the miner
 // this output
-func NewCoinbaseTransaction(to string, data []byte) *block_proto.Transaction {
+func NewCoinbaseTransaction(to wallet.Address, data []byte) *block_proto.Transaction {
 	if data == nil {
 		// create an empty input to make the hash change every time
 		data = make([]byte, 10)
@@ -92,7 +91,7 @@ func NewCoinbaseTransaction(to string, data []byte) *block_proto.Transaction {
 	return &tx
 }
 
-func NewTransaction(db *bolt.DB, w *wallet.Wallet, to string, amount int64) (*block_proto.Transaction, error) {
+func NewTransaction(db *bolt.DB, w *wallet.Wallet, to wallet.Address, amount int64) (*block_proto.Transaction, error) {
 	unspentOutputs, foundAmount := FindSpendableOutputs(db, utils.HashPubKey(w.PublicKey), amount)
 	if foundAmount < amount {
 		return nil, ErrNotEnoughFunds{need: amount, found: foundAmount}
@@ -107,7 +106,7 @@ func NewTransaction(db *bolt.DB, w *wallet.Wallet, to string, amount int64) (*bl
 			})
 		}
 	}
-	outputs := []*block_proto.TXOutput{{Value: amount, PubKeyHash: nil}}
+	outputs := []*block_proto.TXOutput{NewTXOutput(amount, to)}
 	// take the change
 	if foundAmount > amount {
 		outputs = append(outputs, &block_proto.TXOutput{
@@ -130,30 +129,6 @@ func NewTransaction(db *bolt.DB, w *wallet.Wallet, to string, amount int64) (*bl
 // IsCoinbase checks whether the transaction is coinbase
 func IsCoinbase(tx *block_proto.Transaction) bool {
 	return len(tx.VIn) == 1 && len(tx.VIn[0].Txid) == 0 && tx.VIn[0].VoutIndex == -1
-}
-
-// String returns a human-readable representation of a transaction
-func String(tx block_proto.Transaction) string {
-	var lines []string
-
-	lines = append(lines, fmt.Sprintf("--- Transaction %x:", tx.Id))
-
-	for i, input := range tx.VIn {
-
-		lines = append(lines, fmt.Sprintf("     Input %d:", i))
-		lines = append(lines, fmt.Sprintf("       TXID:      %x", input.Txid))
-		lines = append(lines, fmt.Sprintf("       Out:       %d", input.VoutIndex))
-		lines = append(lines, fmt.Sprintf("       Signature: %x", input.Signature))
-		lines = append(lines, fmt.Sprintf("       PubKey:    %x", input.PubKey))
-	}
-
-	for i, output := range tx.VOut {
-		lines = append(lines, fmt.Sprintf("     Output %d:", i))
-		lines = append(lines, fmt.Sprintf("       Value:  %d", output.Value))
-		lines = append(lines, fmt.Sprintf("       PubKeyHash: %x", output.PubKeyHash))
-	}
-
-	return strings.Join(lines, "\n")
 }
 
 // in Sign() function we do not need to verify the pubkey of vin

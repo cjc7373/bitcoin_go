@@ -23,6 +23,9 @@ func OpenDB(conf *utils.Config) *bolt.DB {
 		if _, err := tx.CreateBucketIfNotExists(common.UTXOBucket); err != nil {
 			return err
 		}
+		if _, err := tx.CreateBucketIfNotExists(common.TransactionBucket); err != nil {
+			return err
+		}
 		return nil
 	})
 	if err != nil {

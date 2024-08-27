@@ -1,6 +1,8 @@
 package block
 
 import (
+	"context"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -55,14 +57,15 @@ func newFakeBlockchain() *block_proto.Blockchain {
 	}
 	bc := &block_proto.Blockchain{}
 	var err error
+	ctx := context.Background()
 	// the UXTO will be (txid, outputIndex): (2, 1), (2, 3) (3, 0), (4, 0)
-	_, err = AddBlock(testDB, bc, []*block_proto.Transaction{&tx1})
+	_, err = AddBlock(ctx, testDB, bc, []*block_proto.Transaction{&tx1})
 	Expect(err).NotTo(HaveOccurred())
-	_, err = AddBlock(testDB, bc, []*block_proto.Transaction{&tx2})
+	_, err = AddBlock(ctx, testDB, bc, []*block_proto.Transaction{&tx2})
 	Expect(err).NotTo(HaveOccurred())
-	_, err = AddBlock(testDB, bc, []*block_proto.Transaction{&tx3})
+	_, err = AddBlock(ctx, testDB, bc, []*block_proto.Transaction{&tx3})
 	Expect(err).NotTo(HaveOccurred())
-	_, err = AddBlock(testDB, bc, []*block_proto.Transaction{&tx4})
+	_, err = AddBlock(ctx, testDB, bc, []*block_proto.Transaction{&tx4})
 	Expect(err).NotTo(HaveOccurred())
 
 	return bc

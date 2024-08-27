@@ -1,6 +1,7 @@
 package block
 
 import (
+	"context"
 	"crypto/sha256"
 	"testing"
 	"time"
@@ -46,7 +47,8 @@ var _ = Describe("pow test", func() {
 	It("generates correct hash", func() {
 		block := newDumbBlock()
 		pow := NewProofOfWork(block)
-		nonce, hash := pow.Run()
+		nonce, hash, err := pow.Run(context.Background())
+		Expect(err).NotTo(HaveOccurred())
 		data := pow.prepareData(nonce)
 		actualHash := sha256.Sum256(data)
 		Expect(hash).To(BeEquivalentTo(actualHash))
@@ -68,7 +70,8 @@ var _ = Describe("pow test", func() {
 			start := time.Now()
 			block := newDumbBlock()
 			pow := NewProofOfWork(block)
-			_, _ = pow.Run()
+			_, _, err := pow.Run(context.Background())
+			Expect(err).NotTo(HaveOccurred())
 			elapsed := time.Since(start)
 			GinkgoWriter.Printf("sleeptime: %v, elapsed: %v\n", dur, elapsed)
 		}

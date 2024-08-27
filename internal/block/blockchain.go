@@ -9,6 +9,7 @@ import (
 
 	block_proto "github.com/cjc7373/bitcoin_go/internal/block/proto"
 	"github.com/cjc7373/bitcoin_go/internal/common"
+	"github.com/cjc7373/bitcoin_go/internal/wallet"
 )
 
 var blockchainKey = []byte("blockchain")
@@ -48,7 +49,7 @@ func GetBlockchain(db *bolt.DB) (*block_proto.Blockchain, error) {
 	return bc, nil
 }
 
-func NewBlockchain(bolt_db *bolt.DB, to string) (*block_proto.Blockchain, error) {
+func NewBlockchain(bolt_db *bolt.DB, to wallet.Address) (*block_proto.Blockchain, error) {
 	if err := AddGenesisBlock(bolt_db, to); err != nil {
 		return nil, err
 	}
