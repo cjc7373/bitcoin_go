@@ -59,17 +59,17 @@ type Empty struct{}
 
 type Set[T comparable] map[T]Empty
 
+func NewSet[T comparable](items ...T) Set[T] {
+	ss := make(Set[T], len(items))
+	ss.Insert(items...)
+	return ss
+}
+
 func (s Set[T]) Insert(items ...T) Set[T] {
 	for _, item := range items {
 		s[item] = Empty{}
 	}
 	return s
-}
-
-func New[T comparable](items ...T) Set[T] {
-	ss := make(Set[T], len(items))
-	ss.Insert(items...)
-	return ss
 }
 
 func (s Set[T]) Has(item T) bool {

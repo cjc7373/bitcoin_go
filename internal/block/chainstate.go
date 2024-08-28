@@ -1,9 +1,6 @@
 package block
 
 import (
-	"bytes"
-	"encoding/json"
-
 	bolt "go.etcd.io/bbolt"
 	"google.golang.org/protobuf/proto"
 
@@ -21,41 +18,30 @@ type TXOutputWithMetadata struct {
 	OriginalIndex int32
 }
 
-// find someone's enough outputs to make the tx
-// FIXME: this function needs to iterate chainstate bucket, could be slow
+// find someone's JUST enough outputs to make the tx
 // return a map of someone's UXTOs, key is tx id, value is a set of TXOutputs
-func FindSpendableOutputs(db *bolt.DB, pubkeyHash []byte, amount int64) (unspentOutputs map[string][]TXOutputWithMetadata, found int64) {
-	unspentOutputs = make(map[string][]TXOutputWithMetadata)
+func FindSpendableOutputs(db *bolt.DB, address wallet.Address, amount int64) (enoughUTXOSet *block_proto.UTXOSet, found int64, err error) {
+	enoughUTXOSet = &block_proto.UTXOSet{}
+	utxoSet, err := getUTXOSet(db, address)
+	// fmt.Println("utxoSet: ", (*block_proto.UTXOSetPretty)(utxoSet))
+	if err != nil {
+		return
+	}
 	var accumulated int64 = 0
 
-	err := db.View(func(blotTx *bolt.Tx) error {
-		b := blotTx.Bucket([]byte(common.UTXOBucket))
-		c := b.Cursor()
-
-		for k, v := c.First(); k != nil; k, v = c.Next() {
-			outputs := new([]TXOutputWithMetadata)
-			err := json.Unmarshal(v, outputs)
-			if err != nil {
-				return err
-			}
-			for _, output := range *outputs {
-				if bytes.Equal(output.PubKeyHash, pubkeyHash) && accumulated < amount {
-					accumulated += output.Value
-					unspentOutputs[string(k)] = append(unspentOutputs[string(k)], output)
-				}
-			}
-			if accumulated > amount {
-				break
-			}
+	for _, utxo := range utxoSet.UTXOs {
+		tx, err := GetTransaction(db, utxo.Transaction)
+		if err != nil {
+			return nil, 0, err
 		}
-		return nil
-	})
-
-	if err != nil {
-		panic(err)
+		accumulated += tx.VOut[utxo.OutputIndex].Value
+		enoughUTXOSet.UTXOs = append(enoughUTXOSet.UTXOs, utxo)
+		if accumulated > amount {
+			break
+		}
 	}
 
-	return unspentOutputs, accumulated
+	return enoughUTXOSet, accumulated, nil
 }
 
 func AddBlockToChainstate() {
@@ -126,11 +112,20 @@ func RebuildChainState(db *bolt.DB) error {
 			// coinbase tx doesn't spend any outputs
 			if !IsCoinbase(tx) {
 				for _, input := range tx.VIn {
-					spentOutputs[string(input.Txid)].Insert(int(input.VoutIndex))
+					if spentOutputs[string(input.Txid)] == nil {
+						spentOutputs[string(input.Txid)] = utils.NewSet(int(input.VoutIndex))
+					} else {
+						spentOutputs[string(input.Txid)].Insert(int(input.VoutIndex))
+					}
 				}
 			}
 		}
 	}
+
+	// fmt.Println("allUTXOsets: ")
+	// for k, v := range allUTXOsets {
+	// 	fmt.Printf("pubKeyHash: %x, utxos: txhash: %x, index: %v", k, v.UTXOs[0].Transaction, v.UTXOs[0].OutputIndex)
+	// }
 
 	return db.Update(func(dbTx *bolt.Tx) error {
 		b := dbTx.Bucket(common.UTXOBucket)

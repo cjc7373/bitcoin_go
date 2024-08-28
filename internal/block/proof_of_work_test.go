@@ -61,19 +61,34 @@ var _ = Describe("pow test", func() {
 	})
 
 	// on my computer, the result is
-	// sleeptime: 0s, elapsed: 1.514541ms
-	// sleeptime: 1µs, elapsed: 2.816881144s
-	// sleeptime: 10µs, elapsed: 1m34.779183894s
+	// targetBit = 16
+	// sleeptime: 0s, elapsed: 24.015026ms
+	// sleeptime: 10ms, elapsed: 134.549324ms
+	// sleeptime: 100ms, elapsed: 764.407801ms
+	//
+	// targetBit = 24
+	// sleeptime: 0s, elapsed: 3.747273548s
+	// sleeptime: 100µs, elapsed: 19.122343777s
+	// sleeptime: 1ms, elapsed: 12.675399572s
+	// sleeptime: 10ms, elapsed: 44.332263791s
+	// sleeptime: 100ms, elapsed: 1m58.866277474s
 	XIt("calculates slow down pow time", func() {
-		for _, dur := range []time.Duration{0, time.Microsecond, time.Microsecond * 10} {
+		d := []time.Duration{0, time.Microsecond * 100, time.Millisecond, time.Millisecond * 10, time.Millisecond * 100}
+		for _, dur := range d {
 			PowSleepTime = dur
-			start := time.Now()
-			block := newDumbBlock()
-			pow := NewProofOfWork(block)
-			_, _, err := pow.Run(context.Background())
-			Expect(err).NotTo(HaveOccurred())
-			elapsed := time.Since(start)
-			GinkgoWriter.Printf("sleeptime: %v, elapsed: %v\n", dur, elapsed)
+			targetBits = 24
+			var all time.Duration
+			cnt := 10
+			for i := 0; i < cnt; i++ {
+				start := time.Now()
+				block := newDumbBlock()
+				pow := NewProofOfWork(block)
+				_, _, err := pow.Run(context.Background())
+				Expect(err).NotTo(HaveOccurred())
+				elapsed := time.Since(start)
+				all += elapsed
+			}
+			GinkgoWriter.Printf("=======\nsleeptime: %v, elapsed: %v\n========\n", dur, all/time.Duration(cnt))
 		}
 	})
 })

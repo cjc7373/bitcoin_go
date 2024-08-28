@@ -22,3 +22,14 @@ func (tx *TransactionPretty) String() string {
 	rtn += "} "
 	return rtn
 }
+
+type UTXOSetPretty UTXOSet
+
+func (utxoSet *UTXOSetPretty) String() string {
+	rtn := "["
+	for _, utxo := range utxoSet.UTXOs {
+		rtn += fmt.Sprintf(" {txHash: %x, index: %v}, ", utxo.Transaction, utxo.OutputIndex)
+	}
+	rtn += "]"
+	return rtn
+}

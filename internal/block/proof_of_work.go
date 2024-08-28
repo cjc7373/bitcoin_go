@@ -42,6 +42,7 @@ func NewProofOfWork(b *block_proto.Block) *ProofOfWork {
 }
 
 func (pow *ProofOfWork) prepareData(nonce int64) []byte {
+	// TODO
 	txData, err := json.Marshal(pow.block.Transactions)
 	if err != nil {
 		panic(err)
@@ -75,27 +76,34 @@ func (pow *ProofOfWork) Run(ctx context.Context) (int64, []byte, error) {
 		logger.Info("With transaction", "tx", (*block_proto.TransactionPretty)(tx))
 	}
 	data := pow.prepareData(nonce)
+	batchSize := 10000
+outer:
 	for nonce < maxNonce {
+		cnt := 0
+		// FIXME: select turns out to be very slow, find out why
 		select {
 		case <-ctx.Done():
 			logger.Info("Mining stopped", "err", ctx.Err())
 			return 0, nil, ctx.Err()
 		default:
-			data := pow.setNonce(data, nonce)
-			// we won't use key derivation functions like PBKDF2 and scrypt for simplicity
-			hash = sha256.Sum256(data)
-			hashInt.SetBytes(hash[:])
+			for cnt < batchSize {
+				cnt++
+				data := pow.setNonce(data, nonce)
+				// we won't use key derivation functions like PBKDF2 and scrypt for simplicity
+				hash = sha256.Sum256(data)
+				hashInt.SetBytes(hash[:])
 
-			if hashInt.Cmp(pow.target) == -1 {
-				break
-			} else {
-				nonce++
+				if hashInt.Cmp(pow.target) == -1 {
+					break outer
+				} else {
+					nonce++
+				}
+
 			}
-
 			time.Sleep(PowSleepTime)
 		}
 	}
-	logger.Info("mining completed", "hash", fmt.Sprintf("%x", hash))
+	logger.Info("mining completed", "hash", fmt.Sprintf("%x", hash), "nonce", nonce)
 
 	return nonce, hash[:], nil
 }

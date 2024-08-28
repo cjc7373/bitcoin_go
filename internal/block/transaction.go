@@ -90,19 +90,20 @@ func NewCoinbaseTransaction(to wallet.Address, data []byte) *block_proto.Transac
 }
 
 func NewTransaction(db *bolt.DB, w *wallet.Wallet, to wallet.Address, amount int64) (*block_proto.Transaction, error) {
-	unspentOutputs, foundAmount := FindSpendableOutputs(db, utils.HashPubKey(w.PublicKey), amount)
+	unspentOutputs, foundAmount, err := FindSpendableOutputs(db, w.GetAddress(), amount)
+	if err != nil {
+		return nil, err
+	}
 	if foundAmount < amount {
 		return nil, ErrNotEnoughFunds{need: amount, found: foundAmount}
 	}
 
 	var inputs []*block_proto.TXInput
-	for txID, outputs := range unspentOutputs {
-		for _, output := range outputs {
-			inputs = append(inputs, &block_proto.TXInput{
-				Txid:      []byte(txID),
-				VoutIndex: output.OriginalIndex,
-			})
-		}
+	for _, utxo := range unspentOutputs.UTXOs {
+		inputs = append(inputs, &block_proto.TXInput{
+			Txid:      utxo.Transaction,
+			VoutIndex: utxo.OutputIndex,
+		})
 	}
 	outputs := []*block_proto.TXOutput{NewTXOutput(amount, to)}
 	// take the change

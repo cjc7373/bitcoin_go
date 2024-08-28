@@ -84,13 +84,13 @@ var _ = Describe("chainstate test", func() {
 		Expect(utxoSet.UTXOs[0].Transaction).To(BeEquivalentTo("4"))
 		Expect(utxoSet.UTXOs[0].OutputIndex).To(BeEquivalentTo(0))
 
-		Expect(utxoSet.UTXOs[0].Transaction).To(BeEquivalentTo("3"))
-		Expect(utxoSet.UTXOs[0].OutputIndex).To(BeEquivalentTo(0))
+		Expect(utxoSet.UTXOs[1].Transaction).To(BeEquivalentTo("3"))
+		Expect(utxoSet.UTXOs[1].OutputIndex).To(BeEquivalentTo(0))
 
-		Expect(utxoSet.UTXOs[0].Transaction).To(BeEquivalentTo("2"))
-		Expect(utxoSet.UTXOs[0].OutputIndex).To(BeEquivalentTo(3))
+		Expect(utxoSet.UTXOs[2].Transaction).To(BeEquivalentTo("2"))
+		Expect(utxoSet.UTXOs[2].OutputIndex).To(BeEquivalentTo(1))
 
-		Expect(utxoSet.UTXOs[0].Transaction).To(BeEquivalentTo("2"))
-		Expect(utxoSet.UTXOs[0].OutputIndex).To(BeEquivalentTo(1))
+		Expect(utxoSet.UTXOs[3].Transaction).To(BeEquivalentTo("2"))
+		Expect(utxoSet.UTXOs[3].OutputIndex).To(BeEquivalentTo(3))
 	})
 })
