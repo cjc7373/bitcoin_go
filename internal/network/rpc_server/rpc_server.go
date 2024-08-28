@@ -6,6 +6,7 @@ import (
 	"net"
 
 	bolt "go.etcd.io/bbolt"
+	"google.golang.org/grpc"
 
 	block_proto "github.com/cjc7373/bitcoin_go/internal/block/proto"
 	"github.com/cjc7373/bitcoin_go/internal/db"
@@ -13,7 +14,6 @@ import (
 	"github.com/cjc7373/bitcoin_go/internal/network/proto"
 	"github.com/cjc7373/bitcoin_go/internal/network/rpc_client"
 	"github.com/cjc7373/bitcoin_go/internal/utils"
-	"google.golang.org/grpc"
 )
 
 type BitcoinServer struct {
@@ -36,16 +36,17 @@ type BitcoinServer struct {
 
 func NewRPCServer(logger *slog.Logger, config *utils.Config) BitcoinServer {
 	service := network.NewService()
+	db := db.OpenDB(config)
 
 	return BitcoinServer{
 		s:         service,
 		logger:    logger,
-		RPCClient: rpc_client.NewRPCClient(service, logger),
+		RPCClient: rpc_client.NewRPCClient(service, logger, db),
 		config:    config,
 
 		done: make(chan error),
 
-		DB: db.OpenDB(config),
+		DB: db,
 	}
 }
 

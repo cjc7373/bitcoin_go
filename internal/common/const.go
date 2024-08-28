@@ -13,6 +13,8 @@ var BlockBucket = []byte("block")
 // 32-byte tx hash -> transaction data
 var TransactionBucket = []byte("transaction")
 
+type TxHashSized [32]byte
+
 // in uxto bucket, we'll have:
 // 20-byte pubkey hash -> utxoSet (txhash and the unspent output indexes in that tx)
 var UTXOBucket = []byte("chainstate")

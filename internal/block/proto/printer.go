@@ -33,3 +33,9 @@ func (utxoSet *UTXOSetPretty) String() string {
 	rtn += "]"
 	return rtn
 }
+
+type BlockchainPretty Blockchain
+
+func (bc *BlockchainPretty) String() string {
+	return fmt.Sprintf("Blockchain{tipHash: %x, height: %v}", bc.TipHash, bc.Height)
+}

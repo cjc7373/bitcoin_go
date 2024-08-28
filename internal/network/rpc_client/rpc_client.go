@@ -2,25 +2,30 @@ package rpc_client
 
 import (
 	"context"
-	"log"
 	"log/slog"
 	"time"
 
-	"github.com/cjc7373/bitcoin_go/internal/network"
-	"github.com/cjc7373/bitcoin_go/internal/network/proto"
+	bolt "go.etcd.io/bbolt"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+
+	"github.com/cjc7373/bitcoin_go/internal/block"
+	block_proto "github.com/cjc7373/bitcoin_go/internal/block/proto"
+	"github.com/cjc7373/bitcoin_go/internal/network"
+	"github.com/cjc7373/bitcoin_go/internal/network/proto"
 )
 
 type RPCClient struct {
 	service *network.Service
 	logger  *slog.Logger
+	db      *bolt.DB
 }
 
-func NewRPCClient(service *network.Service, logger *slog.Logger) RPCClient {
+func NewRPCClient(service *network.Service, logger *slog.Logger, db *bolt.DB) RPCClient {
 	return RPCClient{
 		service: service,
 		logger:  logger,
+		db:      db,
 	}
 }
 
@@ -59,6 +64,15 @@ func (c *RPCClient) ConnectNode(address string, name string, localServerAddr, lo
 	return true, nil
 }
 
+func (c *RPCClient) getGrpcClients() []proto.BitcoinClient {
+	connectedNodes := c.service.GetConnectedNodes()
+	clients := make([]proto.BitcoinClient, 0, len(connectedNodes))
+	for _, v := range connectedNodes {
+		clients = append(clients, v.BitcoinClient)
+	}
+	return clients
+}
+
 // this function may block
 func (c *RPCClient) BroadcastNodes(ttl uint32) {
 	connectedNodes := c.service.GetConnectedNodes()
@@ -76,7 +90,22 @@ func (c *RPCClient) BroadcastNodes(ttl uint32) {
 			Nodes: protoNodes,
 		})
 		if err != nil {
-			log.Println(err)
+			c.logger.Error("", "err", err)
+		}
+	}
+}
+
+// this function may block
+func (c *RPCClient) BroadcastBlockchain() {
+	bc, err := block.GetBlockchain(c.db)
+	if err != nil {
+		c.logger.Error("", "err", err)
+	}
+	c.logger.Info("broadcasting blockchain", "blockchain", (*block_proto.Blockchain)(bc))
+	for _, client := range c.getGrpcClients() {
+		_, err := client.SendChainMetadata(context.Background(), bc)
+		if err != nil {
+			c.logger.Error("", "err", err)
 		}
 	}
 }

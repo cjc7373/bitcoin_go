@@ -8,6 +8,8 @@ import (
 
 	"google.golang.org/grpc"
 
+	block_proto "github.com/cjc7373/bitcoin_go/internal/block/proto"
+	"github.com/cjc7373/bitcoin_go/internal/common"
 	"github.com/cjc7373/bitcoin_go/internal/network/proto"
 )
 
@@ -33,6 +35,9 @@ type Service struct {
 	// key is peer's server address
 	// contains connections initiated as a client
 	connectedNodes map[string]*Node
+
+	// since we need to check if a tx is already in the queue, use a map
+	pendingTxQ map[common.TxHashSized]*block_proto.Transaction
 }
 
 func (s *Service) GetConnectedNode(serverAddr string) (*Node, bool) {
@@ -64,5 +69,6 @@ func NewService() *Service {
 	return &Service{
 		ShouldBroadcast: make(chan struct{}),
 		connectedNodes:  make(map[string]*Node),
+		pendingTxQ:      make(map[common.TxHashSized]*block_proto.Transaction),
 	}
 }

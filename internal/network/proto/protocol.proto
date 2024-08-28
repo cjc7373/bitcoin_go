@@ -3,15 +3,15 @@ syntax = "proto3";
 option go_package = "github.com/cjc7373/bitcoin_go/internal/network/proto";
 
 import "internal/block/proto/blockchain.proto";
-// import "internal/block/proto/block.proto";
+import "internal/block/proto/block.proto";
 
 service Bitcoin {
     rpc SendNodes(Nodes) returns (Empty) {}
     // chain metadata will be broadcasted when a new block is mined
     rpc SendChainMetadata(Blockchain) returns (Empty) {}
     // tx will be broadcasted when a node received one from a client
-    // rpc BroadcastTransactions()
-    // rpc RequestBlock()
+    rpc BroadcastTransactions(Transactions) returns (Empty) {}
+    rpc RequestBlock(BlockRequest) returns (BlockResponse) {}
 }
 
 message Nodes {
@@ -23,4 +23,18 @@ message Empty {}
 message Node {
     string address = 1;
     string name = 2;
+}
+
+message Transactions {
+    repeated Transaction txs = 1;
+}
+
+// request blocks from hash, with some length (minimum 1)
+message BlockRequest {
+    bytes hash = 1;
+    int32 length = 2;
+}
+
+message BlockResponse {
+    repeated Block blocks = 1;
 }

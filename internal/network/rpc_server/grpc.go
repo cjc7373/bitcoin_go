@@ -33,5 +33,7 @@ func (d *BitcoinServer) SendNodes(ctx context.Context, nodes *proto.Nodes) (*pro
 }
 
 func (d *BitcoinServer) SendChainMetadata(ctx context.Context, bc *block_proto.Blockchain) (*proto.Empty, error) {
+	// TODO: use metadata to store identity info
+	// use a channel to send this info to a dedicated goroutine to handle?
 	return &proto.Empty{}, nil
 }

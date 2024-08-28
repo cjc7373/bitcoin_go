@@ -20,8 +20,10 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	Bitcoin_SendNodes_FullMethodName         = "/Bitcoin/SendNodes"
-	Bitcoin_SendChainMetadata_FullMethodName = "/Bitcoin/SendChainMetadata"
+	Bitcoin_SendNodes_FullMethodName             = "/Bitcoin/SendNodes"
+	Bitcoin_SendChainMetadata_FullMethodName     = "/Bitcoin/SendChainMetadata"
+	Bitcoin_BroadcastTransactions_FullMethodName = "/Bitcoin/BroadcastTransactions"
+	Bitcoin_RequestBlock_FullMethodName          = "/Bitcoin/RequestBlock"
 )
 
 // BitcoinClient is the client API for Bitcoin service.
@@ -31,6 +33,9 @@ type BitcoinClient interface {
 	SendNodes(ctx context.Context, in *Nodes, opts ...grpc.CallOption) (*Empty, error)
 	// chain metadata will be broadcasted when a new block is mined
 	SendChainMetadata(ctx context.Context, in *proto.Blockchain, opts ...grpc.CallOption) (*Empty, error)
+	// tx will be broadcasted when a node received one from a client
+	BroadcastTransactions(ctx context.Context, in *Transactions, opts ...grpc.CallOption) (*Empty, error)
+	RequestBlock(ctx context.Context, in *BlockRequest, opts ...grpc.CallOption) (*BlockResponse, error)
 }
 
 type bitcoinClient struct {
@@ -59,6 +64,24 @@ func (c *bitcoinClient) SendChainMetadata(ctx context.Context, in *proto.Blockch
 	return out, nil
 }
 
+func (c *bitcoinClient) BroadcastTransactions(ctx context.Context, in *Transactions, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, Bitcoin_BroadcastTransactions_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *bitcoinClient) RequestBlock(ctx context.Context, in *BlockRequest, opts ...grpc.CallOption) (*BlockResponse, error) {
+	out := new(BlockResponse)
+	err := c.cc.Invoke(ctx, Bitcoin_RequestBlock_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // BitcoinServer is the server API for Bitcoin service.
 // All implementations must embed UnimplementedBitcoinServer
 // for forward compatibility
@@ -66,6 +89,9 @@ type BitcoinServer interface {
 	SendNodes(context.Context, *Nodes) (*Empty, error)
 	// chain metadata will be broadcasted when a new block is mined
 	SendChainMetadata(context.Context, *proto.Blockchain) (*Empty, error)
+	// tx will be broadcasted when a node received one from a client
+	BroadcastTransactions(context.Context, *Transactions) (*Empty, error)
+	RequestBlock(context.Context, *BlockRequest) (*BlockResponse, error)
 	mustEmbedUnimplementedBitcoinServer()
 }
 
@@ -78,6 +104,12 @@ func (UnimplementedBitcoinServer) SendNodes(context.Context, *Nodes) (*Empty, er
 }
 func (UnimplementedBitcoinServer) SendChainMetadata(context.Context, *proto.Blockchain) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SendChainMetadata not implemented")
+}
+func (UnimplementedBitcoinServer) BroadcastTransactions(context.Context, *Transactions) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BroadcastTransactions not implemented")
+}
+func (UnimplementedBitcoinServer) RequestBlock(context.Context, *BlockRequest) (*BlockResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RequestBlock not implemented")
 }
 func (UnimplementedBitcoinServer) mustEmbedUnimplementedBitcoinServer() {}
 
@@ -128,6 +160,42 @@ func _Bitcoin_SendChainMetadata_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Bitcoin_BroadcastTransactions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Transactions)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BitcoinServer).BroadcastTransactions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Bitcoin_BroadcastTransactions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BitcoinServer).BroadcastTransactions(ctx, req.(*Transactions))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Bitcoin_RequestBlock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BlockRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BitcoinServer).RequestBlock(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Bitcoin_RequestBlock_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BitcoinServer).RequestBlock(ctx, req.(*BlockRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Bitcoin_ServiceDesc is the grpc.ServiceDesc for Bitcoin service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -142,6 +210,14 @@ var Bitcoin_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SendChainMetadata",
 			Handler:    _Bitcoin_SendChainMetadata_Handler,
+		},
+		{
+			MethodName: "BroadcastTransactions",
+			Handler:    _Bitcoin_BroadcastTransactions_Handler,
+		},
+		{
+			MethodName: "RequestBlock",
+			Handler:    _Bitcoin_RequestBlock_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
